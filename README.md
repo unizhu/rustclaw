@@ -1,8 +1,8 @@
-# RustClaw 🦀
+# RustClaw
 
 A production-ready minimal multi-channel AI gateway written in Rust, inspired by [OpenClaw](https://github.com/openclaw/openclaw).
 
-## Features ✨
+## Features
 
 - **Telegram Integration**: Chat with your AI assistant via Telegram
 - **Multiple LLM Providers**: Support for OpenAI and Ollama
@@ -11,7 +11,7 @@ A production-ready minimal multi-channel AI gateway written in Rust, inspired by
 - **Microservices Architecture**: Clean, maintainable codebase
 - **Production Ready**: No "while true" loops - proper structured concurrency with streams
 
-## Quick Start 🚀
+## Quick Start
 
 ### Prerequisites
 
@@ -56,7 +56,7 @@ ollama pull llama2
 # default = "ollama"
 ```
 
-## Configuration ⚙️
+## Configuration
 
 Configuration is loaded from `rustclaw.toml` and can be overridden with environment variables.
 
@@ -71,7 +71,7 @@ default = "openai"  # or "ollama"
 
 [providers.openai]
 api_key = ""  # Overridden by OPENAI_API_KEY env var
-model = "gpt-4-turbo-preview"
+model = "gpt-5-mini"
 
 [providers.ollama]
 base_url = "http://localhost:11434"
@@ -92,7 +92,7 @@ output = "journald"  # journald, syslog, stdout
 - `OLLAMA_BASE_URL`: Ollama base URL (default: http://localhost:11434)
 - `RUSTCLAW_LOG_LEVEL`: Log level (default: info)
 
-## Architecture 🏗️
+## Architecture
 
 RustClaw uses a service-oriented architecture with Tokio channels for communication:
 
@@ -115,7 +115,7 @@ RustClaw uses a service-oriented architecture with Tokio channels for communicat
     └────────────────────────────────────────────┘
 ```
 
-## Development 👨‍💻
+## Development
 
 ```bash
 # Run tests
@@ -131,7 +131,7 @@ cargo fmt
 cargo run
 ```
 
-## Deployment 🚢
+## Deployment
 
 ### Systemd Service
 
@@ -167,7 +167,7 @@ docker run -d \
   rustclaw
 ```
 
-## Roadmap 🗺️
+## Roadmap
 
 - [ ] Additional channels (Slack, Discord)
 - [ ] Web UI for management
@@ -177,11 +177,11 @@ docker run -d \
 - [ ] Hot configuration reload
 - [ ] Plugin/skill system
 
-## License 📄
+## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## Acknowledgments 🙏
+## Acknowledgments
 
 - Inspired by [OpenClaw](https://github.com/openclaw/openclaw)
-- Built with ❤️ using Rust and Tokio
+- Built with Rust and Tokio
