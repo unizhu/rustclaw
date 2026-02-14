@@ -1,0 +1,13 @@
+[package]
+name = "rustclaw-provider"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rustclaw-types = { path = "../rustclaw-types" }
+tokio.workspace = true
+async-openai.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

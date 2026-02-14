@@ -1,0 +1,24 @@
+[package]
+name = "rustclaw-gateway"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rustclaw-gateway"
+path = "src/main.rs"
+
+[dependencies]
+rustclaw-types = { path = "../rustclaw-types" }
+rustclaw-logging = { path = "../rustclaw-logging" }
+rustclaw-persistence = { path = "../rustclaw-persistence" }
+rustclaw-provider = { path = "../rustclaw-provider" }
+rustclaw-channel = { path = "../rustclaw-channel" }
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+serde.workspace = true
+toml.workspace = true
+config.workspace = true
+dotenvy.workspace = true

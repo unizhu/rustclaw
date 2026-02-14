@@ -1,0 +1,19 @@
+[telegram]
+bot_token = ""  # Set via TELEGRAM_BOT_TOKEN env var
+
+[providers]
+default = "openai"  # or "ollama"
+
+[providers.openai]
+api_key = ""  # Set via OPENAI_API_KEY env var
+model = "gpt-4-turbo-preview"
+
+[providers.ollama]
+base_url = "http://localhost:11434"
+model = "llama2"
+
+[database]
+path = "rustclaw.db"
+
+[logging]
+level = "info"  # trace, debug, info, warn, error

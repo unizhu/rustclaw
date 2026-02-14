@@ -1,0 +1,14 @@
+[package]
+name = "rustclaw-persistence"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rustclaw-types = { path = "../rustclaw-types" }
+tokio.workspace = true
+sqlx.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+chrono.workspace = true

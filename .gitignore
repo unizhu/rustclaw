@@ -1,0 +1,11 @@
+/target
+/Cargo.lock
+*.db
+*.db-shm
+*.db-wal
+.env
+rustclaw.toml
+.DS_Store
+*.log
+.idea
+.vscode
