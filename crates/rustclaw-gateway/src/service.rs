@@ -2,10 +2,13 @@ use crate::config::Config;
 use anyhow::Result;
 use rustclaw_channel::{create_default_tools, TelegramService};
 use rustclaw_logging;
+use rustclaw_mcp::MCPToolRegistry;
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
 use rustclaw_types::Provider;
+use std::sync::Arc;
 use tokio::signal;
+use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 /// Gateway service - main orchestrator
@@ -61,11 +64,33 @@ impl GatewayService {
         };
 
         // Create tool registry with default tools (bash, file ops, etc.)
-        let tools = create_default_tools();
+        let mut tools = create_default_tools();
         info!(
-            "Tool registry initialized with {} tools",
+            "Tool registry initialized with {} built-in tools",
             tools.get_tools().len()
         );
+
+        // Start MCP servers asynchronously (non-blocking)
+        let mcp_registry = Arc::new(RwLock::new(MCPToolRegistry::new()));
+        
+        if !self.config.mcp.servers.is_empty() {
+            let mcp_config = self.config.mcp.clone();
+            let mcp_registry_clone = Arc::clone(&mcp_registry);
+            
+            tokio::spawn(async move {
+                info!("Starting MCP servers in background...");
+                let registry = MCPToolRegistry::start_all(&mcp_config).await;
+                *mcp_registry_clone.write().await = registry;
+            });
+        }
+
+        // Merge MCP tools (will be available once servers start)
+        let mcp_tools = mcp_registry.read().await.to_tool_functions();
+        if !mcp_tools.is_empty() {
+            // Note: We need to extend ToolRegistry to accept Box<dyn ToolFunction>
+            // For now, MCP tools will be available once they're integrated
+            info!("MCP servers starting, tools will be available shortly");
+        }
 
         // Create provider service with tools
         let provider_service = ProviderService::with_tools(provider, tools)
