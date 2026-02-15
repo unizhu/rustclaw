@@ -48,10 +48,10 @@ impl MCPClient {
             TransportType::Stdio(command_str) => {
                 Self::start_stdio(&name, &command_str, timeout).await?
             }
-            TransportType::HTTP(_url, _headers) => {
+            TransportType::HTTP(url, _headers) => {
                 #[cfg(feature = "http")]
                 {
-                    Self::start_http(&name, &_url, timeout).await?
+                    Self::start_http(&name, &url, timeout)?
                 }
                 #[cfg(not(feature = "http"))]
                 {
@@ -85,7 +85,7 @@ impl MCPClient {
         // Attempt to spawn the process
         let child = cmd.spawn().map_err(|e| MCPError::StartupFailed {
             server: name.into(),
-            reason: format!("Failed to spawn '{}': {}", program, e),
+            reason: format!("Failed to spawn '{program}': {e}"),
         })?;
 
         // Wait a bit to see if the process stays alive
@@ -103,7 +103,10 @@ impl MCPClient {
     }
 
     /// Call a tool on this MCP server
-    pub async fn call_tool(&self, tool_name: &str, _args: Value) -> Result<Value> {
+    ///
+    /// # Errors
+    /// Returns an error if the tool call fails or is not implemented
+    pub fn call_tool(&self, tool_name: &str, _args: Value) -> Result<Value> {
         debug!("Calling tool '{}' on server '{}'", tool_name, self.name);
 
         // Simulated for now - will implement with rmcp
@@ -116,7 +119,7 @@ impl MCPClient {
 /// Placeholder for HTTP transport (will be implemented later)
 #[cfg(feature = "http")]
 impl MCPClient {
-    async fn start_http(name: &str, _url: &str, _timeout: Duration) -> Result<Self> {
+    fn start_http(name: &str, _url: &str, _timeout: Duration) -> Result<Self> {
         warn!("HTTP transport not yet implemented for server '{}'", name);
         Err(MCPError::Config(
             "HTTP transport implementation pending".into(),

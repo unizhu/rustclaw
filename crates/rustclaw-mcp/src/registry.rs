@@ -85,6 +85,9 @@ impl MCPToolRegistry {
     }
 
     /// Execute a tool on a specific server
+    ///
+    /// # Errors
+    /// Returns an error if the server or tool is not found, or if execution fails
     pub async fn execute(
         &self,
         server_name: &str,
@@ -100,7 +103,7 @@ impl MCPToolRegistry {
                 tool: tool_name.into(),
             })?;
 
-        client.call_tool(tool_name, args).await
+        client.call_tool(tool_name, args)
     }
 
     /// Get all tools from all connected servers as `ToolFunction` wrappers

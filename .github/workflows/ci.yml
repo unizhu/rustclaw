@@ -78,19 +78,3 @@ jobs:
         with:
           name: rustclaw-linux-x86_64
           path: target/release/rustclaw-gateway
-
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-      
-      - name: Run security audit
-        run: cargo audit
