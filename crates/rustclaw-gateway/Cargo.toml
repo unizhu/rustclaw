@@ -16,6 +16,7 @@ rustclaw-persistence = { path = "../rustclaw-persistence" }
 rustclaw-provider = { path = "../rustclaw-provider" }
 rustclaw-channel = { path = "../rustclaw-channel" }
 rustclaw-mcp = { path = "../rustclaw-mcp" }
+rustclaw-mcp = { path = "../rustclaw-mcp" }
 tokio.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
