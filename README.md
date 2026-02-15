@@ -6,6 +6,7 @@ A production-ready minimal multi-channel AI gateway written in Rust, inspired by
 
 - **Telegram Integration**: Chat with your AI assistant via Telegram
 - **Multiple LLM Providers**: Support for OpenAI and Ollama
+- **MCP Integration**: Connect to Model Context Protocol servers for extended tool capabilities
 - **SQLite Persistence**: Local-first conversation storage
 - **Structured Logging**: journald/syslog support
 - **Microservices Architecture**: Clean, maintainable codebase

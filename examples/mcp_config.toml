@@ -1,0 +1,42 @@
+# RustClaw Configuration with MCP Example
+
+[telegram]
+bot_token = ""  # Set via TELEGRAM_BOT_TOKEN env var
+
+[providers]
+default = "openai"
+
+[providers.openai]
+api_key = ""  # Set via OPENAI_API_KEY env var
+model = "gpt-4o-mini"
+
+[agent]
+max_tool_iterations = 10
+context_window = 128000
+recent_turns = 10
+
+[database]
+path = "rustclaw.db"
+
+[logging]
+level = "info"
+
+# MCP Configuration
+[mcp]
+startup_timeout = 10  # Global default timeout in seconds
+
+[mcp.servers]
+# Filesystem MCP server (stdio transport)
+filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
+
+# GitHub MCP server (requires GITHUB_TOKEN env var)
+# github = "mcp-server-github"
+
+# Custom MCP server with timeout override
+# slow_server = { 
+#   command = "my-slow-server --port 8080",
+#   startup_timeout = 30
+# }
+
+# HTTP-based MCP server (SSE transport)
+# weather = "http://localhost:3000/sse"
