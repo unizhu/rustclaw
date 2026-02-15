@@ -100,6 +100,7 @@ pub struct ProviderService {
     provider: Provider,
     tools: ToolRegistry,
     system_prompt: String,
+    max_tool_iterations: usize,
 }
 
 impl ProviderService {
@@ -109,6 +110,7 @@ impl ProviderService {
             provider,
             tools: ToolRegistry::new(),
             system_prompt: "You are a helpful AI assistant.".to_string(),
+            max_tool_iterations: 5,
         }
     }
 
@@ -118,12 +120,19 @@ impl ProviderService {
             provider,
             tools,
             system_prompt: "You are a helpful AI assistant.".to_string(),
+            max_tool_iterations: 5,
         }
     }
 
     /// Set the system prompt
     pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.system_prompt = prompt.into();
+        self
+    }
+
+    /// Set the maximum number of tool iterations
+    pub fn with_max_tool_iterations(mut self, max: usize) -> Self {
+        self.max_tool_iterations = max;
         self
     }
 
@@ -186,6 +195,15 @@ impl ProviderService {
     /// Execute tool calls and return results
     pub async fn execute_tool_calls(&self, tool_calls: &[ToolCall]) -> Vec<ToolResult> {
         tool_calls.iter().map(|call| self.tools.execute_call(call)).collect()
+    }
+
+    /// Complete with automatic tool execution using configured max iterations
+    pub async fn complete_agentic_default(
+        &self,
+        messages: &[Message],
+        prompt: &str,
+    ) -> Result<String> {
+        self.complete_agentic(messages, prompt, self.max_tool_iterations).await
     }
 
     /// Complete with automatic tool execution (agentic loop)

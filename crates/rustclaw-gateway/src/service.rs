@@ -25,6 +25,14 @@ impl GatewayService {
         rustclaw_logging::init_logging(&self.config.logging.level)?;
         info!("Starting RustClaw Gateway Service");
 
+        // Log agent config
+        info!(
+            "Agent config: max_tool_iterations={}, context_window={}, recent_turns={}",
+            self.config.agent.max_tool_iterations,
+            self.config.agent.context_window,
+            self.config.agent.recent_turns
+        );
+
         // Initialize persistence
         let persistence = PersistenceService::new(&self.config.database.path).await?;
         info!("Persistence service initialized");
@@ -61,11 +69,19 @@ impl GatewayService {
 
         // Create provider service with tools
         let provider_service = ProviderService::with_tools(provider, tools)
+            .with_max_tool_iterations(self.config.agent.max_tool_iterations)
             .with_system_prompt(
                 "You are a helpful AI assistant. You have access to tools for executing \
                  bash commands, reading files, and listing directories. Use these tools \
-                 when the user asks you to perform system operations. Always be helpful \
-                 and provide clear explanations."
+                 when the user asks you to perform system operations. \
+                 \
+                 CRITICAL TOOL CALLING RULES: \
+                 1. When using a tool, output ONLY the tool call with valid JSON arguments \
+                 2. NEVER add markdown code blocks, bash commands, or any text after tool calls \
+                 3. Tool arguments must be pure JSON with no extra formatting \
+                 4. Wait for the tool result before continuing \
+                 \
+                 Always be helpful and provide clear explanations."
             );
         info!("Provider service initialized");
 

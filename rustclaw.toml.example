@@ -20,6 +20,16 @@ base_url = ""  # Optional: Set via OPENAI_BASE_URL env var
 base_url = "http://localhost:11434"
 model = "llama3"
 
+[agent]
+# Maximum number of tool calls per request (prevents infinite loops)
+max_tool_iterations = 10
+
+# Context window size in tokens (for compression decisions)
+context_window = 128000
+
+# Number of recent conversation turns to keep before compression
+recent_turns = 10
+
 [database]
 path = "rustclaw.db"
 

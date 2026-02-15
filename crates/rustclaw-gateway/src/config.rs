@@ -20,6 +20,11 @@ base_url = ""  # Optional: Set via OPENAI_BASE_URL env var
 base_url = "http://localhost:11434"
 model = "llama3"
 
+[agent]
+max_tool_iterations = 10  # Maximum tool calls per request
+context_window = 128000   # Token limit for context
+recent_turns = 10         # Turns to keep before compression
+
 [database]
 path = "rustclaw.db"
 
@@ -54,6 +59,35 @@ pub struct ProvidersConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct AgentConfig {
+    /// Maximum number of tool iterations per request
+    #[serde(default = "default_max_tool_iterations")]
+    pub max_tool_iterations: usize,
+    
+    /// Context window size in tokens
+    #[serde(default = "default_context_window")]
+    pub context_window: usize,
+    
+    /// Number of recent turns to keep before compression
+    #[serde(default = "default_recent_turns")]
+    pub recent_turns: usize,
+}
+
+fn default_max_tool_iterations() -> usize { 10 }
+fn default_context_window() -> usize { 128_000 }
+fn default_recent_turns() -> usize { 10 }
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            max_tool_iterations: default_max_tool_iterations(),
+            context_window: default_context_window(),
+            recent_turns: default_recent_turns(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     pub path: String,
 }
@@ -67,6 +101,8 @@ pub struct LoggingConfig {
 pub struct Config {
     pub telegram: TelegramConfig,
     pub providers: ProvidersConfig,
+    #[serde(default)]
+    pub agent: AgentConfig,
     pub database: DatabaseConfig,
     pub logging: LoggingConfig,
 }
@@ -110,8 +146,8 @@ impl Config {
         // Ensure global config exists
         let global_config_path = Self::ensure_global_config()?;
 
-        // Build config with layered sources (later sources override earlier ones)
-        let mut config_builder = config::Config::builder()
+        // Build config with layered sources using builder pattern
+        let mut builder = config::Config::builder()
             // Layer 1: Global config (required - we just created it if missing)
             .add_source(config::File::from(global_config_path))
             // Layer 2: Local workspace config (optional override)
@@ -121,23 +157,29 @@ impl Config {
 
         // Layer 4: Apply convenience env var overrides (highest priority)
         if let Ok(token) = env::var("TELEGRAM_BOT_TOKEN") {
-            config_builder = config_builder.set_override("telegram__bot_token", token)?;
+            builder = builder.set_override("telegram__bot_token", token)?;
         }
 
         if let Ok(key) = env::var("OPENAI_API_KEY") {
-            config_builder = config_builder.set_override("providers__openai__api_key", key)?;
+            builder = builder.set_override("providers__openai__api_key", key)?;
         }
 
         if let Ok(url) = env::var("OPENAI_BASE_URL") {
-            config_builder = config_builder.set_override("providers__openai__base_url", url)?;
+            builder = builder.set_override("providers__openai__base_url", url)?;
         }
 
         if let Ok(url) = env::var("OLLAMA_BASE_URL") {
-            config_builder = config_builder.set_override("providers__ollama__base_url", url)?;
+            builder = builder.set_override("providers__ollama__base_url", url)?;
         }
 
-        let config = config_builder.build()?;
+        // Agent config overrides
+        if let Ok(iterations) = env::var("RUSTCLAW_MAX_TOOL_ITERATIONS") {
+            if let Ok(v) = iterations.parse::<i64>() {
+                builder = builder.set_override("agent__max_tool_iterations", v)?;
+            }
+        }
 
+        let config = builder.build()?;
         let config: Self = config.try_deserialize()?;
         Ok(config)
     }

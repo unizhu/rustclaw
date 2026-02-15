@@ -268,10 +268,8 @@ impl TelegramService {
         // Get AI response using agentic loop (handles tools automatically)
         let response = {
             let provider = provider.read().await;
-            // Use agentic completion with max 5 tool iterations
-            provider
-                .complete_agentic(&recent_messages, text, 5)
-                .await
+            // Use agentic completion with configured max iterations
+            provider.complete_agentic_default(&recent_messages, text).await
         };
 
         match response {
