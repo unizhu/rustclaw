@@ -48,7 +48,8 @@ impl rustclaw_provider::ToolFunction for MCPToolWrapper {
                     .ok_or_else(|| anyhow::anyhow!("MCP server '{server}' not available"))?;
 
                 // call_tool is no longer async since it's a placeholder
-                client.call_tool(&tool, args)
+                client
+                    .call_tool(&tool, args)
                     .map_err(|e| anyhow::anyhow!("MCP tool call failed: {e}"))
             })
         })
