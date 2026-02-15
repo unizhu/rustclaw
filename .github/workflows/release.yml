@@ -38,18 +38,10 @@ jobs:
       with:
         fetch-depth: 0
     
-    - name: Get commit message
-      id: commit
-      run: |
-        MSG=$(git log -1 --pretty=%B ${{ github.event.after }})
-        echo "message<<EOF" >> $GITHUB_OUTPUT
-        echo "$MSG" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-    
     - name: Determine build targets
       id: set-matrix
       run: |
-        COMMIT_MSG="${{ steps.commit.outputs.message }}"
+        COMMIT_MSG="${{ github.event.head_commit.message }}"
         INPUT_TARGET="${{ github.event.inputs.build_targets }}"
         
         # Default: build all
@@ -136,12 +128,6 @@ jobs:
         # Prepare binary
         cd target/${{ matrix.target }}/release
         BINARY_NAME="rustclaw-gateway"
-        
-        if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
-          ARCH="amd64"
-        else
-          ARCH="arm64"
-        fi
         
         tar -czf rustclaw-${{ matrix.target }}.tar.gz $BINARY_NAME
         mv rustclaw-${{ matrix.target }}.tar.gz ${{ github.workspace }}/
