@@ -1,73 +1,56 @@
-//! Tool bridge for MCP - bridges tools between different MCP servers
+//! Bridge between MCP tools and rustclaw's `ToolFunction` trait
 
-use crate::client::MCPClient;
-use crate::error::{MCPError, Result};
+use crate::client::ToolDefinition;
+use anyhow::Result;
+use rustclaw_types::Tool;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Tool bridge that can route tool calls to different MCP servers
-pub struct ToolBridge {
-    /// Map of server name to MCP client
-    clients: RwLock<HashMap<String, MCPClient>>,
+/// Wrapper that makes MCP tools look like rustclaw tools
+pub struct MCPToolWrapper {
+    /// Server name
+    pub server_name: String,
+    /// Original MCP tool name
+    pub tool_name: String,
+    /// Full namespaced tool name (`server_tool`)
+    pub full_name: String,
+    /// Tool definition from MCP server
+    pub definition: ToolDefinition,
+    /// Reference to registry for tool execution
+    pub registry: Arc<RwLock<std::collections::HashMap<String, crate::client::MCPClient>>>,
 }
 
-impl ToolBridge {
-    /// Create a new tool bridge
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            clients: RwLock::new(HashMap::new()),
-        }
+impl rustclaw_provider::ToolFunction for MCPToolWrapper {
+    fn definition(&self) -> Tool {
+        Tool::function(
+            &self.full_name,
+            self.definition
+                .description
+                .as_deref()
+                .unwrap_or("No description"),
+            self.definition.input_schema.clone(),
+        )
     }
 
-    /// Register an MCP client with the bridge
-    pub async fn register(&self, name: String, client: MCPClient) {
-        let mut clients = self.clients.write().await;
-        clients.insert(name, client);
-    }
+    fn execute(&self, args: Value) -> Result<Value> {
+        // Convert async execution to sync (ToolFunction is sync)
+        let registry = Arc::clone(&self.registry);
+        let server = self.server_name.clone();
+        let tool = self.tool_name.clone();
 
-    /// Execute a tool on a specific server
-    ///
-    /// # Errors
-    /// Returns an error if the server or tool is not found, or if execution fails
-    pub async fn execute(
-        &self,
-        server_name: &str,
-        tool: &str,
-        args: Value,
-    ) -> Result<Value, MCPError> {
-        let clients = self.clients.read().await;
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let clients = registry.read().await;
 
-        let client = clients
-            .get(server_name)
-            .ok_or_else(|| MCPError::ToolNotFound {
-                server: server_name.into(),
-                tool: tool.into(),
-            })?;
+                let client = clients
+                    .get(&server)
+                    .ok_or_else(|| anyhow::anyhow!("MCP server '{server}' not available"))?;
 
-        // call_tool is no longer async since it's a placeholder
-        client.call_tool(tool, args)
-    }
-
-    /// List all available tools from all registered servers
-    #[must_use]
-    pub async fn list_tools(&self) -> Vec<(String, String)> {
-        let clients = self.clients.read().await;
-        let mut tools = Vec::new();
-
-        for (server_name, client) in clients.iter() {
-            for tool in &client.tools {
-                tools.push((server_name.clone(), tool.name.clone()));
-            }
-        }
-
-        tools
-    }
-}
-
-impl Default for ToolBridge {
-    fn default() -> Self {
-        Self::new()
+                // call_tool is no longer async since it's a placeholder
+                client.call_tool(&tool, args)
+                    .map_err(|e| anyhow::anyhow!("MCP tool call failed: {e}"))
+            })
+        })
     }
 }
