@@ -72,6 +72,7 @@ default = "openai"  # or "ollama"
 [providers.openai]
 api_key = ""  # Overridden by OPENAI_API_KEY env var
 model = "gpt-5-mini"
+base_url = ""  # Optional: Overridden by OPENAI_BASE_URL env var
 
 [providers.ollama]
 base_url = "http://localhost:11434"
@@ -89,6 +90,7 @@ output = "journald"  # journald, syslog, stdout
 
 - `TELEGRAM_BOT_TOKEN`: Telegram bot token
 - `OPENAI_API_KEY`: OpenAI API key
+- `OPENAI_BASE_URL`: OpenAI base URL (optional, for custom endpoints)
 - `OLLAMA_BASE_URL`: Ollama base URL (default: http://localhost:11434)
 - `RUSTCLAW_LOG_LEVEL`: Log level (default: info)
 

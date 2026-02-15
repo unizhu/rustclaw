@@ -10,6 +10,7 @@ pub struct TelegramConfig {
 pub struct OpenAIConfig {
     pub api_key: String,
     pub model: String,
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -64,6 +65,10 @@ impl Config {
 
         if let Ok(key) = env::var("OPENAI_API_KEY") {
             config.set("providers__openai__api_key", key)?;
+        }
+
+        if let Ok(url) = env::var("OPENAI_BASE_URL") {
+            config.set("providers__openai__base_url", url)?;
         }
 
         if let Ok(url) = env::var("OLLAMA_BASE_URL") {

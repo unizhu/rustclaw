@@ -31,7 +31,13 @@ impl GatewayService {
 
         // Initialize provider based on config
         let provider = match self.config.providers.default.as_str() {
-            "openai" => Provider::openai(&self.config.providers.openai.model),
+            "openai" => {
+                if let Some(base_url) = &self.config.providers.openai.base_url {
+                    Provider::openai_with_base_url(&self.config.providers.openai.model, base_url)
+                } else {
+                    Provider::openai(&self.config.providers.openai.model)
+                }
+            }
             "ollama" => Provider::ollama(
                 &self.config.providers.ollama.model,
                 &self.config.providers.ollama.base_url,

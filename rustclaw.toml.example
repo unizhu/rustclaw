@@ -6,11 +6,12 @@ default = "openai"  # or "ollama"
 
 [providers.openai]
 api_key = ""  # Set via OPENAI_API_KEY env var
-model = "gpt-4-turbo-preview"
+model = "gpt-5-mini"
+base_url = ""  # Optional: Set via OPENAI_BASE_URL env var
 
 [providers.ollama]
 base_url = "http://localhost:11434"
-model = "llama2"
+model = "llama3"
 
 [database]
 path = "rustclaw.db"

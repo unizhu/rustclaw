@@ -18,7 +18,7 @@ impl ProviderService {
     /// Complete a conversation using the configured provider
     pub async fn complete(&self, messages: &[Message], prompt: &str) -> Result<String> {
         match &self.provider {
-            ProviderType::OpenAI { model } => self.complete_openai(model, messages, prompt).await,
+            ProviderType::OpenAI { model, base_url } => self.complete_openai(model, base_url.as_deref(), messages, prompt).await,
             ProviderType::Ollama { model, base_url } => {
                 self.complete_ollama(model, base_url, messages, prompt).await
             }
@@ -29,6 +29,7 @@ impl ProviderService {
     async fn complete_openai(
         &self,
         model: &str,
+        base_url: Option<&str>,
         messages: &[Message],
         prompt: &str,
     ) -> Result<String> {
@@ -38,7 +39,12 @@ impl ProviderService {
             CreateChatCompletionRequestArgs,
         };
 
-        let client = Client::new();
+        let client = if let Some(url) = base_url {
+            let config = OpenAIConfig::new().with_api_base(url);
+            Client::with_config(config)
+        } else {
+            Client::new()
+        };
 
         // Build conversation history
         let mut chat_messages = vec![
