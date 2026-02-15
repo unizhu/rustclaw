@@ -30,14 +30,11 @@ cd rustclaw
 # Build
 cargo build --release
 
-# Create config file
-cp rustclaw.toml.example rustclaw.toml
-
-# Set environment variables
+# Set environment variables (or edit ~/.rustclaw/rustclaw.toml after first run)
 export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
 export OPENAI_API_KEY="your_openai_api_key"
 
-# Run
+# Run (will auto-create ~/.rustclaw/rustclaw.toml on first run)
 ./target/release/rustclaw-gateway
 ```
 
@@ -58,41 +55,60 @@ ollama pull llama2
 
 ## Configuration
 
-Configuration is loaded from `rustclaw.toml` and can be overridden with environment variables.
+Configuration uses a layered approach with the following priority (highest to lowest):
 
-### Config File (`rustclaw.toml`)
+1. **Environment variables** - Convenience vars like `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`
+2. **Local config** - `./rustclaw.toml` in the current working directory (for project-specific overrides)
+3. **Global config** - `~/.rustclaw/rustclaw.toml` (auto-created on first run if missing)
+
+### Global Config (`~/.rustclaw/rustclaw.toml`)
+
+This is the primary configuration file, automatically created on first run:
 
 ```toml
 [telegram]
-bot_token = ""  # Overridden by TELEGRAM_BOT_TOKEN env var
+bot_token = ""  # Set via TELEGRAM_BOT_TOKEN env var
 
 [providers]
 default = "openai"  # or "ollama"
 
 [providers.openai]
-api_key = ""  # Overridden by OPENAI_API_KEY env var
-model = "gpt-5-mini"
-base_url = ""  # Optional: Overridden by OPENAI_BASE_URL env var
+api_key = ""  # Set via OPENAI_API_KEY env var
+model = "gpt-4o-mini"
+base_url = ""  # Optional: Set via OPENAI_BASE_URL env var
 
 [providers.ollama]
 base_url = "http://localhost:11434"
-model = "llama2"
+model = "llama3"
 
 [database]
 path = "rustclaw.db"
 
 [logging]
 level = "info"  # trace, debug, info, warn, error
-output = "journald"  # journald, syslog, stdout
+```
+
+### Local Override (`./rustclaw.toml`)
+
+Place a `rustclaw.toml` in your working directory to override specific settings for that project. For example:
+
+```toml
+[providers]
+default = "ollama"  # Use Ollama for this project
+
+[providers.ollama]
+model = "codellama"  # Use a different model
 ```
 
 ### Environment Variables
 
-- `TELEGRAM_BOT_TOKEN`: Telegram bot token
-- `OPENAI_API_KEY`: OpenAI API key
-- `OPENAI_BASE_URL`: OpenAI base URL (optional, for custom endpoints)
-- `OLLAMA_BASE_URL`: Ollama base URL (default: http://localhost:11434)
-- `RUSTCLAW_LOG_LEVEL`: Log level (default: info)
+| Variable | Description | Config Path |
+|----------|-------------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | `telegram.bot_token` |
+| `OPENAI_API_KEY` | OpenAI API key | `providers.openai.api_key` |
+| `OPENAI_BASE_URL` | OpenAI base URL | `providers.openai.base_url` |
+| `OLLAMA_BASE_URL` | Ollama base URL | `providers.ollama.base_url` |
+| `RUSTCLAW__*` | Any config value | Uses `__` as separator |
 
 ## Architecture
 

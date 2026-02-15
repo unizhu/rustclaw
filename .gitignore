@@ -9,3 +9,5 @@ rustclaw.toml
 *.log
 .idea
 .vscode
+.env
+workspace/

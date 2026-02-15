@@ -1,3 +1,10 @@
+# RustClaw Configuration Example
+# 
+# Config loading priority (highest to lowest):
+# 1. Environment variables (TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, etc.)
+# 2. Local ./rustclaw.toml (workspace override)
+# 3. Global ~/.rustclaw/rustclaw.toml (auto-created on first run)
+
 [telegram]
 bot_token = ""  # Set via TELEGRAM_BOT_TOKEN env var
 
@@ -6,7 +13,7 @@ default = "openai"  # or "ollama"
 
 [providers.openai]
 api_key = ""  # Set via OPENAI_API_KEY env var
-model = "gpt-5-mini"
+model = "gpt-4o-mini"
 base_url = ""  # Optional: Set via OPENAI_BASE_URL env var
 
 [providers.ollama]

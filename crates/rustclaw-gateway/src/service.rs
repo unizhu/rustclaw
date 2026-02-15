@@ -59,7 +59,9 @@ impl GatewayService {
 
         // Setup signal handler for graceful shutdown
         let shutdown = async {
-            signal::ctrl_c().await.expect("Failed to install Ctrl+C handler");
+            if let Err(e) = signal::ctrl_c().await {
+                error!("Failed to install Ctrl+C handler: {}", e);
+            }
             info!("Received shutdown signal");
         };
 

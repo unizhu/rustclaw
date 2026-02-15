@@ -43,6 +43,7 @@ futures = "0.3"
 # Configuration
 config = "0.14"
 dotenvy = "0.15"
+dirs = "5.0"
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
