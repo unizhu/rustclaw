@@ -48,7 +48,7 @@ impl MCPClient {
             TransportType::Stdio(command_str) => {
                 Self::start_stdio(&name, &command_str, timeout).await?
             }
-            TransportType::HTTP(url, _headers) => {
+            TransportType::HTTP(_url, _headers) => {
                 #[cfg(feature = "http")]
                 {
                     Self::start_http(&name, &url, timeout)?
