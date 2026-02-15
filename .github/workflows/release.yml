@@ -40,7 +40,11 @@ jobs:
     
     - name: Get commit message
       id: commit
-      run: echo "message=$(git log -1 --pretty=%B ${{ github.event.after }})" >> $GITHUB_OUTPUT
+      run: |
+        MSG=$(git log -1 --pretty=%B ${{ github.event.after }})
+        echo "message<<EOF" >> $GITHUB_OUTPUT
+        echo "$MSG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
     
     - name: Determine build targets
       id: set-matrix
@@ -57,24 +61,18 @@ jobs:
         # Check for tag push (release)
         if [[ "${{ github.ref }}" == refs/tags/* ]]; then
           SHOULD_RELEASE="true"
-          echo "📦 Tag detected - will create release"
         fi
         
         # Check commit message for CI directives
         if [[ "$COMMIT_MSG" == *"[ci-linux]"* ]]; then
           BUILD_MACOS="false"
           BUILD_WINDOWS="false"
-          echo "🐧 Building Linux only (ci-linux directive)"
         elif [[ "$COMMIT_MSG" == *"[ci-macos]"* ]]; then
           BUILD_LINUX="false"
           BUILD_WINDOWS="false"
-          echo "🍎 Building macOS only (ci-macos directive)"
         elif [[ "$COMMIT_MSG" == *"[ci-windows]"* ]]; then
           BUILD_LINUX="false"
           BUILD_MACOS="false"
-          echo "🪟 Building Windows only (ci-windows directive)"
-        elif [[ "$COMMIT_MSG" == *"[ci-all]"* ]]; then
-          echo "🌍 Building all platforms (ci-all directive)"
         fi
         
         # Override with manual input if provided
@@ -101,7 +99,6 @@ jobs:
               BUILD_WINDOWS="true"
               ;;
           esac
-          echo "manual input: $INPUT_TARGET"
         fi
         
         echo "build_linux=$BUILD_LINUX" >> $GITHUB_OUTPUT
@@ -322,7 +319,6 @@ jobs:
         VERSION=$(grep -m 1 'version = "' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/')
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-        echo "📦 Version: $VERSION"
     
     - name: Download all artifacts
       uses: actions/download-artifact@v4
