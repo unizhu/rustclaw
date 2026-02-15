@@ -1,0 +1,51 @@
+[package]
+name = "rustclaw-mcp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# MCP SDK
+rmcp = { version = "0.1", features = ["client"] }
+
+# Internal crates
+rustclaw-types = { path = "../rustclaw-types" }
+
+# Async runtime
+tokio = { workspace = true, features = ["process", "time", "sync", "rt-multi-thread"] }
+tokio-stream.workspace = true
+futures.workspace = true
+
+# HTTP client (optional)
+reqwest = { version = "0.12", features = ["json", "stream"], optional = true }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+[features]
+default = ["stdio"]
+stdio = []
+http = ["reqwest"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+# Quality gates
+[lints.rust]
+dead_code = "deny"
+unused_imports = "deny"
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+pedantic = "warn"

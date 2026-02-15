@@ -6,6 +6,7 @@ members = [
     "crates/rustclaw-provider",
     "crates/rustclaw-channel",
     "crates/rustclaw-gateway",
+    "crates/rustclaw-mcp",
 ]
 resolver = "2"
 
