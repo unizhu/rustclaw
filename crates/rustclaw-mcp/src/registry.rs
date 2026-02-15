@@ -2,7 +2,7 @@
 
 use crate::client::MCPClient;
 use crate::config::MCPConfig;
-use crate::error::{MCPError, Result};
+use crate::error::MCPError;
 use crate::tool_bridge::MCPToolWrapper;
 use rustclaw_types::Tool;
 use serde_json::Value;
@@ -86,7 +86,7 @@ impl MCPToolRegistry {
         server_name: &str,
         tool_name: &str,
         args: Value,
-    ) -> Result<Value> {
+    ) -> Result<Value, MCPError> {
         let clients = self.clients.read().await;
         
         let client = clients
