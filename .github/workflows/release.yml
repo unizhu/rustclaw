@@ -40,10 +40,8 @@ jobs:
     
     - name: Determine build targets
       id: set-matrix
+      shell: bash
       run: |
-        COMMIT_MSG="${{ github.event.head_commit.message }}"
-        INPUT_TARGET="${{ github.event.inputs.build_targets }}"
-        
         # Default: build all
         BUILD_LINUX="true"
         BUILD_MACOS="true"
@@ -56,6 +54,7 @@ jobs:
         fi
         
         # Check commit message for CI directives
+        COMMIT_MSG="${{ github.event.head_commit.message }}"
         if [[ "$COMMIT_MSG" == *"[ci-linux]"* ]]; then
           BUILD_MACOS="false"
           BUILD_WINDOWS="false"
@@ -68,6 +67,7 @@ jobs:
         fi
         
         # Override with manual input if provided
+        INPUT_TARGET="${{ github.event.inputs.build_targets }}"
         if [ -n "$INPUT_TARGET" ]; then
           case "$INPUT_TARGET" in
             linux)
@@ -284,7 +284,7 @@ jobs:
       run: cargo test --all-features --workspace
     
     - name: Check formatting
-      run: cargo fmt -- --check
+      run: cargo fmt --all -- --check
     
     - name: Clippy
       run: cargo clippy --all-features --workspace -- -D warnings
