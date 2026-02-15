@@ -10,6 +10,14 @@ use tracing::{error, info};
 /// Maximum message length for Telegram (4096 chars, but we use less to be safe)
 const MAX_MESSAGE_LENGTH: usize = 4000;
 
+/// Sensitive file patterns that require user confirmation
+const SENSITIVE_PATTERNS: &[&str] = &[
+    ".ssh/", "id_rsa", "id_ed25519", ".pem", ".key",
+    ".pgp", ".gnupg", "credentials", "secrets", ".env",
+    "password", "token", "api_key", "apikey",
+    ".aws/", ".kube/", ".docker/",
+];
+
 /// Telegram channel service
 pub struct TelegramService {
     bot: Bot,
@@ -41,15 +49,6 @@ impl TelegramService {
             persistence: Arc::new(RwLock::new(persistence)),
             provider: Arc::new(RwLock::new(provider)),
         }
-    }
-
-    /// Create a new Telegram service with custom tools
-    pub fn with_tools(
-        token: &str,
-        persistence: PersistenceService,
-        provider: ProviderService,
-    ) -> Self {
-        Self::new(token, persistence, provider)
     }
 
     /// Validate the bot token by making a test API call
@@ -217,9 +216,12 @@ impl TelegramService {
                     &bot,
                     chat_id,
                     "🔧 Available tools:\n\n\
-                     • echo - Echo back a message\n\
-                     • get_current_time - Get current date/time\n\n\
-                     More tools can be added by extending the tool registry.",
+                     📁 **bash** - Execute bash commands (ls, cat, grep, curl, git, etc.)\n\
+                     📄 **read_file** - Read file contents\n\
+                     📂 **list_dir** - List directory contents\n\
+                     ⏰ **get_current_time** - Get current date/time\n\
+                     📢 **echo** - Echo back a message\n\n\
+                     ⚠️ Sensitive files (SSH keys, passwords) require your confirmation.",
                 )
                 .await?;
             }
@@ -302,8 +304,24 @@ impl ToolFunction for BashTool {
     fn definition(&self) -> Tool {
         Tool::function(
             "bash",
-            "Execute a bash command. Use for file operations, system info, etc. \
-             Commands are restricted to safe operations.",
+            "Execute bash/shell commands on the system.\n\n\
+             \n**SUPPORTED COMMANDS:**\n\
+             - File ops: ls, cat, head, tail, find, grep, wc, tree, mkdir, cp, mv, touch\n\
+             - System info: uname, date, whoami, pwd, df, du, free, ps, top, uptime\n\
+             - Text processing: sed, awk, sort, uniq, cut, tr, jq\n\
+             - Network: curl, wget, ping, nslookup, dig, nc (read-only)\n\
+             - Archives: tar, zip, unzip, gzip\n\
+             - Git: git status, git log, git diff, git branch, git show\n\
+             - Package info: npm list, pip list, pip freeze, cargo tree, go list\n\
+             - Misc: which, whereis, file, stat, chmod, chown (non-destructive)\n\
+             \n**BLOCKED COMMANDS:**\n\
+             - sudo, su (no privilege escalation)\n\
+             - rm -rf /, mkfs, dd (dangerous disk operations)\n\
+             - Fork bombs or infinite loops\n\
+             \n**IMPORTANT:**\n\
+             - For DELETING files (rm, rmdir), ask user for confirmation first!\n\
+             - For READING sensitive files (SSH keys, .pem, .key, passwords, .env, credentials), ALWAYS ask user permission first!\n\
+             - Set confirm_destructive=true only after user confirms",
             serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -315,6 +333,16 @@ impl ToolFunction for BashTool {
                         "type": "integer",
                         "description": "Timeout in seconds (default: 30, max: 120)",
                         "default": 30
+                    },
+                    "confirm_destructive": {
+                        "type": "boolean",
+                        "description": "Set to true if user confirmed destructive operations (rm, del, format)",
+                        "default": false
+                    },
+                    "confirm_sensitive": {
+                        "type": "boolean", 
+                        "description": "Set to true if user confirmed reading sensitive files (keys, passwords, secrets)",
+                        "default": false
                     }
                 },
                 "required": ["command"],
@@ -335,17 +363,64 @@ impl ToolFunction for BashTool {
             .unwrap_or(30)
             .min(120);
 
-        // Block dangerous commands
-        let dangerous = ["rm -rf /", "sudo", "mkfs", "dd if=", "> /dev/sd", ":(){ :|:& };:"];
+        let confirm_destructive = args
+            .get("confirm_destructive")
+            .and_then(|c| c.as_bool())
+            .unwrap_or(false);
+
+        let confirm_sensitive = args
+            .get("confirm_sensitive")
+            .and_then(|c| c.as_bool())
+            .unwrap_or(false);
+
+        // Block always-dangerous commands
+        let dangerous = ["rm -rf /", "sudo ", "sudo\t", "mkfs", "dd if=", "> /dev/sd", ":(){ :|:& };:"];
         for pattern in dangerous {
             if command.contains(pattern) {
                 return Ok(serde_json::json!({
                     "success": false,
-                    "error": format!("Command blocked: contains unsafe pattern '{}'", pattern)
+                    "blocked": true,
+                    "error": format!("Command blocked: contains unsafe pattern '{}'", pattern.trim())
                 }));
             }
         }
 
+        // Check for sensitive file access without confirmation
+        if !confirm_sensitive {
+            for pattern in SENSITIVE_PATTERNS {
+                if command.contains(pattern) {
+                    return Ok(serde_json::json!({
+                        "success": false,
+                        "needs_confirmation": true,
+                        "confirmation_type": "sensitive_file",
+                        "error": format!(
+                            "⚠️ SENSITIVE FILE DETECTED: The command appears to access '{}' which may contain secrets, keys, or credentials.\n\nPlease ask the user: \"This command may access sensitive files. Do you want me to proceed?\"",
+                            pattern
+                        )
+                    }));
+                }
+            }
+        }
+
+        // Check for destructive commands without confirmation
+        if !confirm_destructive {
+            let destructive_patterns = ["rm ", "rm -", "rmdir", "del ", "format ", "shred "];
+            for pattern in destructive_patterns {
+                if command.contains(pattern) {
+                    return Ok(serde_json::json!({
+                        "success": false,
+                        "needs_confirmation": true,
+                        "confirmation_type": "destructive",
+                        "error": format!(
+                            "⚠️ DESTRUCTIVE COMMAND: '{}'\n\nThis will delete files. Please ask the user: \"This command will delete files. Are you sure you want to proceed?\"",
+                            command
+                        )
+                    }));
+                }
+            }
+        }
+
+        // Execute the command
         let output = std::process::Command::new("bash")
             .arg("-c")
             .arg(command)
@@ -357,29 +432,43 @@ impl ToolFunction for BashTool {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 let success = output.status.success();
 
+                // Truncate very long output
+                let stdout_str = if stdout.len() > 15000 {
+                    format!(
+                        "{}...\n\n[Output truncated: showing first 15KB of {} bytes total]",
+                        &stdout[..15000],
+                        stdout.len()
+                    )
+                } else {
+                    stdout.to_string()
+                };
+
                 Ok(serde_json::json!({
                     "success": success,
-                    "stdout": stdout,
+                    "stdout": stdout_str,
                     "stderr": stderr,
                     "exit_code": output.status.code()
                 }))
             }
             Err(e) => Ok(serde_json::json!({
                 "success": false,
-                "error": e.to_string()
+                "error": format!("Failed to execute command: {}", e)
             })),
         }
     }
 }
 
-/// Tool for reading files
+/// Tool for reading files (with sensitive file protection)
 pub struct ReadFileTool;
 
 impl ToolFunction for ReadFileTool {
     fn definition(&self) -> Tool {
         Tool::function(
             "read_file",
-            "Read the contents of a file",
+            "Read the contents of a file.\n\n\
+             ⚠️ IMPORTANT: For sensitive files (SSH keys: id_rsa, id_ed25519; certificates: .pem, .key; \
+             secrets: .env, credentials, passwords, tokens), ALWAYS ask the user for permission first!\n\
+             Set confirm_sensitive=true only after user confirms.",
             serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -391,6 +480,11 @@ impl ToolFunction for ReadFileTool {
                         "type": "integer",
                         "description": "Maximum number of lines to read (default: 100)",
                         "default": 100
+                    },
+                    "confirm_sensitive": {
+                        "type": "boolean",
+                        "description": "Set to true if user confirmed reading sensitive files",
+                        "default": false
                     }
                 },
                 "required": ["path"],
@@ -410,21 +504,46 @@ impl ToolFunction for ReadFileTool {
             .and_then(|l| l.as_u64())
             .unwrap_or(100) as usize;
 
+        let confirm_sensitive = args
+            .get("confirm_sensitive")
+            .and_then(|c| c.as_bool())
+            .unwrap_or(false);
+
+        // Check for sensitive file access
+        if !confirm_sensitive {
+            let lower_path = path.to_lowercase();
+            for pattern in SENSITIVE_PATTERNS {
+                if lower_path.contains(&pattern.to_lowercase()) {
+                    return Ok(serde_json::json!({
+                        "success": false,
+                        "needs_confirmation": true,
+                        "confirmation_type": "sensitive_file",
+                        "error": format!(
+                            "⚠️ SENSITIVE FILE: '{}' appears to be a sensitive file (key, credential, or secret).\n\nPlease ask the user: \"This file may contain sensitive information. Do you want me to read it?\"",
+                            path
+                        )
+                    }));
+                }
+            }
+        }
+
         let content = std::fs::read_to_string(path);
 
         match content {
             Ok(content) => {
+                let total_lines = content.lines().count();
                 let lines: Vec<&str> = content.lines().take(max_lines).collect();
                 Ok(serde_json::json!({
                     "success": true,
                     "content": lines.join("\n"),
                     "lines_read": lines.len(),
-                    "truncated": content.lines().count() > max_lines
+                    "total_lines": total_lines,
+                    "truncated": total_lines > max_lines
                 }))
             }
             Err(e) => Ok(serde_json::json!({
                 "success": false,
-                "error": e.to_string()
+                "error": format!("Failed to read file: {}", e)
             })),
         }
     }
@@ -437,7 +556,7 @@ impl ToolFunction for ListDirTool {
     fn definition(&self) -> Tool {
         Tool::function(
             "list_dir",
-            "List contents of a directory",
+            "List contents of a directory. Shows files and subdirectories with their types.",
             serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -479,14 +598,91 @@ impl ToolFunction for ListDirTool {
 
                 Ok(serde_json::json!({
                     "success": true,
+                    "path": path,
                     "directories": dirs,
                     "files": files,
+                    "total_dirs": dirs.len(),
+                    "total_files": files.len(),
                     "total": dirs.len() + files.len()
                 }))
             }
             Err(e) => Ok(serde_json::json!({
                 "success": false,
-                "error": e.to_string()
+                "error": format!("Failed to list directory: {}", e)
+            })),
+        }
+    }
+}
+
+/// Tool for writing files
+pub struct WriteFileTool;
+
+impl ToolFunction for WriteFileTool {
+    fn definition(&self) -> Tool {
+        Tool::function(
+            "write_file",
+            "Write content to a file. Creates the file if it doesn't exist, overwrites if it does.\n\n\
+             ⚠️ IMPORTANT: This will OVERWRITE existing files. Ask user confirmation before overwriting important files!",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "The path to the file to write"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The content to write to the file"
+                    },
+                    "confirm_overwrite": {
+                        "type": "boolean",
+                        "description": "Set to true if user confirmed overwriting an existing file",
+                        "default": false
+                    }
+                },
+                "required": ["path", "content"],
+                "additionalProperties": false
+            }),
+        )
+    }
+
+    fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
+        let path = args
+            .get("path")
+            .and_then(|p| p.as_str())
+            .ok_or_else(|| anyhow!("Missing 'path' argument"))?;
+
+        let content = args
+            .get("content")
+            .and_then(|c| c.as_str())
+            .ok_or_else(|| anyhow!("Missing 'content' argument"))?;
+
+        let confirm_overwrite = args
+            .get("confirm_overwrite")
+            .and_then(|c| c.as_bool())
+            .unwrap_or(false);
+
+        // Check if file exists
+        if std::path::Path::new(path).exists() && !confirm_overwrite {
+            return Ok(serde_json::json!({
+                "success": false,
+                "needs_confirmation": true,
+                "confirmation_type": "overwrite",
+                "error": format!(
+                    "⚠️ FILE EXISTS: '{}' already exists. Overwriting will destroy its current contents.\n\nPlease ask the user: \"This file already exists. Do you want to overwrite it?\"",
+                    path
+                )
+            }));
+        }
+
+        match std::fs::write(path, content) {
+            Ok(_) => Ok(serde_json::json!({
+                "success": true,
+                "message": format!("Successfully wrote to '{}'", path)
+            })),
+            Err(e) => Ok(serde_json::json!({
+                "success": false,
+                "error": format!("Failed to write file: {}", e)
             })),
         }
     }
@@ -500,5 +696,6 @@ pub fn create_default_tools() -> ToolRegistry {
     registry.register(Box::new(BashTool));
     registry.register(Box::new(ReadFileTool));
     registry.register(Box::new(ListDirTool));
+    registry.register(Box::new(WriteFileTool));
     registry
 }
