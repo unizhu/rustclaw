@@ -84,7 +84,7 @@ impl GatewayService {
         }
 
         // Merge MCP tools (will be available once servers start)
-        let mcp_tools = mcp_registry.read().await.to_tool_functions();
+        let mcp_tools = mcp_registry.read().await.to_tool_functions().await;
         if !mcp_tools.is_empty() {
             // Note: We need to extend ToolRegistry to accept Box<dyn ToolFunction>
             // For now, MCP tools will be available once they're integrated

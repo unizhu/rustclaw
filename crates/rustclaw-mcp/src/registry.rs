@@ -100,9 +100,8 @@ impl MCPToolRegistry {
     }
     
     /// Get all tools from all connected servers as `ToolFunction` wrappers
-    #[must_use] 
-    pub fn to_tool_functions(&self) -> Vec<Box<dyn rustclaw_provider::ToolFunction>> {
-        let clients = self.clients.blocking_read();
+    pub async fn to_tool_functions(&self) -> Vec<Box<dyn rustclaw_provider::ToolFunction>> {
+        let clients = self.clients.read().await;
         let mut tools = Vec::new();
         
         for (server_name, client) in clients.iter() {
@@ -123,22 +122,19 @@ impl MCPToolRegistry {
     }
     
     /// Check if registry is empty
-    #[must_use] 
-    pub fn is_empty(&self) -> bool {
-        self.clients.blocking_read().is_empty()
+    pub async fn is_empty(&self) -> bool {
+        self.clients.read().await.is_empty()
     }
     
     /// Get number of connected servers
-    #[must_use] 
-    pub fn server_count(&self) -> usize {
-        self.clients.blocking_read().len()
+    pub async fn server_count(&self) -> usize {
+        self.clients.read().await.len()
     }
     
     /// Get total tool count across all servers
-    #[must_use] 
-    pub fn tool_count(&self) -> usize {
+    pub async fn tool_count(&self) -> usize {
         self.clients
-            .blocking_read()
+            .read().await
             .values()
             .map(|c| c.tools.len())
             .sum()

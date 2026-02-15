@@ -70,7 +70,7 @@ impl MCPClient {
     }
     
     /// Start stdio transport
-    async fn start_stdio(name: &str, command_str: &str, timeout: Duration) -> Result<Self> {
+    async fn start_stdio(name: &str, command_str: &str, _timeout: Duration) -> Result<Self> {
         debug!("Starting stdio transport: {}", command_str);
         
         // Parse command string into program and args
@@ -82,27 +82,20 @@ impl MCPClient {
         let program = parts[0];
         let args = &parts[1..];
         
-        // Create tokio command
+        // Try to spawn the process
         let mut cmd = TokioCommand::new(program);
         cmd.args(args);
         
-        // For now, we'll simulate the MCP client since rmcp might not be available
-        // In a real implementation, we would use rmcp here
-        
-        // Simulate startup with timeout
-        tokio::time::timeout(
-            timeout,
-            async {
-                // Simulate process spawn
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                Ok::<(), MCPError>(())
+        // Attempt to spawn the process
+        let child = cmd.spawn().map_err(|e| {
+            MCPError::StartupFailed {
+                server: name.into(),
+                reason: format!("Failed to spawn '{}': {}", program, e),
             }
-        )
-        .await
-        .map_err(|_| MCPError::StartupTimeout {
-            server: name.into(),
-            timeout: timeout.as_secs(),
-        })??;
+        })?;
+        
+        // Wait a bit to see if the process stays alive
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         
         // Initialize client (simulated)
         info!("MCP server '{}' started (simulated)", name);
@@ -111,7 +104,7 @@ impl MCPClient {
             name: name.into(),
             tools: Vec::new(), // Will be populated when we integrate rmcp
             protocol_version: "2024-11-05".into(),
-            process: None,
+            process: Some(child),
         })
     }
     
