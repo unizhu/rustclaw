@@ -70,19 +70,25 @@ pub struct AgentConfig {
     /// Maximum number of tool iterations per request
     #[serde(default = "default_max_tool_iterations")]
     pub max_tool_iterations: usize,
-    
+
     /// Context window size in tokens
     #[serde(default = "default_context_window")]
     pub context_window: usize,
-    
+
     /// Number of recent turns to keep before compression
     #[serde(default = "default_recent_turns")]
     pub recent_turns: usize,
 }
 
-fn default_max_tool_iterations() -> usize { 10 }
-fn default_context_window() -> usize { 128_000 }
-fn default_recent_turns() -> usize { 10 }
+fn default_max_tool_iterations() -> usize {
+    10
+}
+fn default_context_window() -> usize {
+    128_000
+}
+fn default_recent_turns() -> usize {
+    10
+}
 
 impl Default for AgentConfig {
     fn default() -> Self {
@@ -183,9 +189,10 @@ impl Config {
 
         // Agent config overrides
         if let Ok(iterations) = env::var("RUSTCLAW_MAX_TOOL_ITERATIONS")
-            && let Ok(v) = iterations.parse::<i64>() {
-                builder = builder.set_override("agent__max_tool_iterations", v)?;
-            }
+            && let Ok(v) = iterations.parse::<i64>()
+        {
+            builder = builder.set_override("agent__max_tool_iterations", v)?;
+        }
 
         let config = builder.build()?;
         let config: Self = config.try_deserialize()?;

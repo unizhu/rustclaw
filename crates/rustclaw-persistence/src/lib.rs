@@ -13,11 +13,14 @@ impl PersistenceService {
     pub async fn new(database_path: &str) -> Result<Self> {
         let database_url = format!("sqlite:{}?mode=rwc", database_path);
         let pool = SqlitePool::connect(&database_url).await?;
-        
+
         let service = Self { pool };
         service.run_migrations().await?;
-        
-        info!("Persistence service initialized with database: {}", database_path);
+
+        info!(
+            "Persistence service initialized with database: {}",
+            database_path
+        );
         Ok(service)
     }
 
@@ -132,7 +135,7 @@ impl PersistenceService {
                 let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp_str)
                     .map(|dt| dt.with_timezone(&chrono::Utc))
                     .unwrap_or_else(|_| chrono::Utc::now());
-                
+
                 Message {
                     id: row.get("message_id"),
                     chat_id: row.get("chat_id"),

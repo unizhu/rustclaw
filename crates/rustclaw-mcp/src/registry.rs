@@ -19,33 +19,33 @@ pub struct MCPToolRegistry {
 
 impl MCPToolRegistry {
     /// Create an empty registry
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// Start all MCP servers configured in parallel
     pub async fn start_all(config: &MCPConfig) -> Self {
         let registry = Self::new();
-        
+
         if config.servers.is_empty() {
             info!("No MCP servers configured");
             return registry;
         }
-        
+
         info!("Starting {} MCP server(s)", config.servers.len());
-        
+
         let mut tasks = JoinSet::new();
-        
+
         // Spawn all clients concurrently
         for (name, server_config) in &config.servers {
             let name = name.clone();
             let config = server_config.clone();
             let timeout_secs = config.get_timeout(10).as_secs();
             let clients = Arc::clone(&registry.clients);
-            
+
             tasks.spawn(async move {
                 match MCPClient::start(
                     name.clone(),
@@ -70,16 +70,20 @@ impl MCPToolRegistry {
                 }
             });
         }
-        
+
         // Wait for all tasks to complete
         while tasks.join_next().await.is_some() {}
-        
+
         let count = registry.clients.read().await.len();
-        info!("MCP registry ready: {}/{} servers started", count, config.servers.len());
-        
+        info!(
+            "MCP registry ready: {}/{} servers started",
+            count,
+            config.servers.len()
+        );
+
         registry
     }
-    
+
     /// Execute a tool on a specific server
     pub async fn execute(
         &self,
@@ -88,22 +92,22 @@ impl MCPToolRegistry {
         args: Value,
     ) -> Result<Value, MCPError> {
         let clients = self.clients.read().await;
-        
+
         let client = clients
             .get(server_name)
             .ok_or_else(|| MCPError::ToolNotFound {
                 server: server_name.into(),
                 tool: tool_name.into(),
             })?;
-        
+
         client.call_tool(tool_name, args).await
     }
-    
+
     /// Get all tools from all connected servers as `ToolFunction` wrappers
     pub async fn to_tool_functions(&self) -> Vec<Box<dyn rustclaw_provider::ToolFunction>> {
         let clients = self.clients.read().await;
         let mut tools = Vec::new();
-        
+
         for (server_name, client) in clients.iter() {
             for mcp_tool in &client.tools {
                 let wrapper = MCPToolWrapper {
@@ -113,28 +117,29 @@ impl MCPToolRegistry {
                     definition: mcp_tool.clone(),
                     registry: Arc::clone(&self.clients),
                 };
-                
+
                 tools.push(Box::new(wrapper) as Box<dyn rustclaw_provider::ToolFunction>);
             }
         }
-        
+
         tools
     }
-    
+
     /// Check if registry is empty
     pub async fn is_empty(&self) -> bool {
         self.clients.read().await.is_empty()
     }
-    
+
     /// Get number of connected servers
     pub async fn server_count(&self) -> usize {
         self.clients.read().await.len()
     }
-    
+
     /// Get total tool count across all servers
     pub async fn tool_count(&self) -> usize {
         self.clients
-            .read().await
+            .read()
+            .await
             .values()
             .map(|c| c.tools.len())
             .sum()

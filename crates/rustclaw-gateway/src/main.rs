@@ -9,7 +9,7 @@ use service::GatewayService;
 async fn main() -> Result<()> {
     // Load configuration
     let config = Config::load()?;
-    
+
     // Create and run gateway service
     let gateway = GatewayService::new(config);
     gateway.run().await

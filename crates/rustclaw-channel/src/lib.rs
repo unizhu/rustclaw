@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::{EchoTool, ProviderService, ToolFunction, ToolRegistry};
 use rustclaw_types::{Message as RustClawMessage, MessageContent, Tool, User};
@@ -12,10 +12,23 @@ const MAX_MESSAGE_LENGTH: usize = 4000;
 
 /// Sensitive file patterns that require user confirmation
 const SENSITIVE_PATTERNS: &[&str] = &[
-    ".ssh/", "id_rsa", "id_ed25519", ".pem", ".key",
-    ".pgp", ".gnupg", "credentials", "secrets", ".env",
-    "password", "token", "api_key", "apikey",
-    ".aws/", ".kube/", ".docker/",
+    ".ssh/",
+    "id_rsa",
+    "id_ed25519",
+    ".pem",
+    ".key",
+    ".pgp",
+    ".gnupg",
+    "credentials",
+    "secrets",
+    ".env",
+    "password",
+    "token",
+    "api_key",
+    "apikey",
+    ".aws/",
+    ".kube/",
+    ".docker/",
 ];
 
 /// Telegram channel service
@@ -86,8 +99,7 @@ impl TelegramService {
                     .endpoint(Self::handle_command),
             )
             .branch(
-                dptree::filter(|msg: Message| msg.text().is_some())
-                    .endpoint(Self::handle_message),
+                dptree::filter(|msg: Message| msg.text().is_some()).endpoint(Self::handle_message),
             );
 
         let mut dispatcher = Dispatcher::builder(self.bot.clone(), handler)
@@ -181,8 +193,11 @@ impl TelegramService {
         let chunks = Self::split_message(text);
         for (i, chunk) in chunks.iter().enumerate() {
             if chunks.len() > 1 {
-                bot.send_message(chat_id, format!("({}/{})\n\n{}", i + 1, chunks.len(), chunk))
-                    .await?;
+                bot.send_message(
+                    chat_id,
+                    format!("({}/{})\n\n{}", i + 1, chunks.len(), chunk),
+                )
+                .await?;
             } else {
                 bot.send_message(chat_id, chunk).await?;
             }
@@ -191,7 +206,11 @@ impl TelegramService {
     }
 
     /// Handle bot commands
-    async fn handle_command(bot: Bot, msg: Message, cmd: Command) -> Result<(), teloxide::RequestError> {
+    async fn handle_command(
+        bot: Bot,
+        msg: Message,
+        cmd: Command,
+    ) -> Result<(), teloxide::RequestError> {
         let chat_id = msg.chat.id;
 
         match cmd {
@@ -206,7 +225,8 @@ impl TelegramService {
                 .await?;
             }
             Command::Help => {
-                Self::send_message_safe(&bot, chat_id, &Command::descriptions().to_string()).await?;
+                Self::send_message_safe(&bot, chat_id, &Command::descriptions().to_string())
+                    .await?;
             }
             Command::Clear => {
                 Self::send_message_safe(&bot, chat_id, "🗑️ Conversation history cleared.").await?;
@@ -271,7 +291,9 @@ impl TelegramService {
         let response = {
             let provider = provider.read().await;
             // Use agentic completion with configured max iterations
-            provider.complete_agentic_default(&recent_messages, text).await
+            provider
+                .complete_agentic_default(&recent_messages, text)
+                .await
         };
 
         match response {
@@ -280,12 +302,7 @@ impl TelegramService {
             }
             Err(e) => {
                 error!("Failed to get AI response: {}", e);
-                Self::send_message_safe(
-                    &bot,
-                    chat_id,
-                    &format!("❌ Error: {}", e),
-                )
-                .await?;
+                Self::send_message_safe(&bot, chat_id, &format!("❌ Error: {}", e)).await?;
             }
         }
 
@@ -340,7 +357,7 @@ impl ToolFunction for BashTool {
                         "default": false
                     },
                     "confirm_sensitive": {
-                        "type": "boolean", 
+                        "type": "boolean",
                         "description": "Set to true if user confirmed reading sensitive files (keys, passwords, secrets)",
                         "default": false
                     }
@@ -374,7 +391,15 @@ impl ToolFunction for BashTool {
             .unwrap_or(false);
 
         // Block always-dangerous commands
-        let dangerous = ["rm -rf /", "sudo ", "sudo\t", "mkfs", "dd if=", "> /dev/sd", ":(){ :|:& };:"];
+        let dangerous = [
+            "rm -rf /",
+            "sudo ",
+            "sudo\t",
+            "mkfs",
+            "dd if=",
+            "> /dev/sd",
+            ":(){ :|:& };:",
+        ];
         for pattern in dangerous {
             if command.contains(pattern) {
                 return Ok(serde_json::json!({
@@ -499,10 +524,7 @@ impl ToolFunction for ReadFileTool {
             .and_then(|p| p.as_str())
             .ok_or_else(|| anyhow!("Missing 'path' argument"))?;
 
-        let max_lines = args
-            .get("lines")
-            .and_then(|l| l.as_u64())
-            .unwrap_or(100) as usize;
+        let max_lines = args.get("lines").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
 
         let confirm_sensitive = args
             .get("confirm_sensitive")
@@ -572,10 +594,7 @@ impl ToolFunction for ListDirTool {
     }
 
     fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        let path = args
-            .get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
 
         let entries = std::fs::read_dir(path);
 

@@ -25,27 +25,28 @@ impl rustclaw_provider::ToolFunction for MCPToolWrapper {
     fn definition(&self) -> Tool {
         Tool::function(
             &self.full_name,
-            self.definition.description.as_deref().unwrap_or("No description"),
+            self.definition
+                .description
+                .as_deref()
+                .unwrap_or("No description"),
             self.definition.input_schema.clone(),
         )
     }
-    
+
     fn execute(&self, args: Value) -> Result<Value> {
         // Convert async execution to sync (ToolFunction is sync)
         let registry = Arc::clone(&self.registry);
         let server = self.server_name.clone();
         let tool = self.tool_name.clone();
-        
+
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let clients = registry.read().await;
-                
+
                 let client = clients
                     .get(&server)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("MCP server '{server}' not available")
-                    })?;
-                
+                    .ok_or_else(|| anyhow::anyhow!("MCP server '{server}' not available"))?;
+
                 client
                     .call_tool(&tool, args)
                     .await

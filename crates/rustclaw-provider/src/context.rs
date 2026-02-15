@@ -278,7 +278,9 @@ impl ContextManager {
 
         for i in 0..turns_to_mask {
             if let Some(turn) = self.turns.get_mut(i)
-                && !turn.is_masked && !turn.is_summarized {
+                && !turn.is_masked
+                && !turn.is_summarized
+            {
                 let old_tokens = turn.token_count;
                 *turn = turn.masked();
                 tokens_saved += old_tokens.saturating_sub(turn.token_count);
@@ -315,10 +317,9 @@ impl ContextManager {
     /// Apply a summary (replacing old turns)
     pub fn apply_summary(&mut self, summary: ConversationSummary) {
         let token_count = summary.token_count;
-        
+
         // Remove summarized turns
-        let summarized_ids: std::collections::HashSet<_> =
-            summary.turns_covered.iter().collect();
+        let summarized_ids: std::collections::HashSet<_> = summary.turns_covered.iter().collect();
 
         let mut removed_tokens = 0;
         self.turns.retain(|t| {
@@ -343,13 +344,17 @@ impl ContextManager {
             is_masked: false,
         };
 
-        self.total_tokens = self.total_tokens
+        self.total_tokens = self
+            .total_tokens
             .saturating_sub(removed_tokens)
             .saturating_add(token_count);
         self.turns.push_front(summary_turn);
         self.summaries.push(summary);
 
-        info!("Applied summary, saved {} tokens", removed_tokens.saturating_sub(token_count));
+        info!(
+            "Applied summary, saved {} tokens",
+            removed_tokens.saturating_sub(token_count)
+        );
     }
 
     /// Get all messages for API call
@@ -455,7 +460,11 @@ pub fn generate_summarization_prompt(turns: &[&ConversationTurn]) -> String {
                 Role::Assistant => "Assistant",
                 Role::Tool => "Tool",
             };
-            format!("{}: {}", role, t.content.as_deref().unwrap_or("[tool call]"))
+            format!(
+                "{}: {}",
+                role,
+                t.content.as_deref().unwrap_or("[tool call]")
+            )
         })
         .collect::<Vec<_>>()
         .join("\n");

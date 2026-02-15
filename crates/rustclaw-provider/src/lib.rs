@@ -5,16 +5,18 @@
 
 pub mod context;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use async_openai::Client;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::chat::{
-    ChatChoice, ChatCompletionRequestSystemMessageArgs,
-    ChatCompletionRequestUserMessageArgs, ChatCompletionTools, ChatCompletionTool,
-    CreateChatCompletionRequestArgs, ChatCompletionRequestMessage,
-    ChatCompletionRequestToolMessageArgs, FunctionObject, ChatCompletionMessageToolCalls,
+    ChatChoice, ChatCompletionMessageToolCalls, ChatCompletionRequestMessage,
+    ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestToolMessageArgs,
+    ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionTools,
+    CreateChatCompletionRequestArgs, FunctionObject,
 };
-use async_openai::Client;
-use rustclaw_types::{CompletionResponse, Message, MessageContent, Provider, Tool, ToolCall, ToolResult};
+use rustclaw_types::{
+    CompletionResponse, Message, MessageContent, Provider, Tool, ToolCall, ToolResult,
+};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -26,7 +28,7 @@ use tracing::{debug, info, warn};
 pub trait ToolFunction: Send + Sync {
     /// Get the tool definition
     fn definition(&self) -> Tool;
-    
+
     /// Execute the tool with the given arguments
     fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value>;
 }
@@ -86,7 +88,8 @@ impl ToolRegistry {
             },
             Err(e) => ToolResult::new(
                 call.id.clone(),
-                serde_json::json!({"error": format!("Failed to parse arguments: {}", e)}).to_string(),
+                serde_json::json!({"error": format!("Failed to parse arguments: {}", e)})
+                    .to_string(),
             ),
         }
     }
@@ -157,10 +160,10 @@ impl ProviderService {
         tool_results: Option<Vec<ToolResult>>,
     ) -> Result<CompletionResponse> {
         let client = self.create_client()?;
-        
+
         // Build chat messages
         let chat_messages = self.build_messages(messages, prompt, tool_results)?;
-        
+
         // Build request
         let request = if !self.tools.is_empty() {
             let tools = self.build_tools_for_api()?;
@@ -191,7 +194,10 @@ impl ProviderService {
 
     /// Execute tool calls and return results
     pub async fn execute_tool_calls(&self, tool_calls: &[ToolCall]) -> Vec<ToolResult> {
-        tool_calls.iter().map(|call| self.tools.execute_call(call)).collect()
+        tool_calls
+            .iter()
+            .map(|call| self.tools.execute_call(call))
+            .collect()
     }
 
     /// Complete with automatic tool execution using configured max iterations
@@ -200,7 +206,8 @@ impl ProviderService {
         messages: &[Message],
         prompt: &str,
     ) -> Result<String> {
-        self.complete_agentic(messages, prompt, self.max_tool_iterations).await
+        self.complete_agentic(messages, prompt, self.max_tool_iterations)
+            .await
     }
 
     /// Complete with automatic tool execution (agentic loop)
@@ -216,7 +223,7 @@ impl ProviderService {
 
         for iteration in 0..max_iterations {
             debug!("Agentic iteration {} of {}", iteration + 1, max_iterations);
-            
+
             let response = self
                 .complete_with_tools(&current_messages, &current_prompt, tool_results.take())
                 .await?;
@@ -227,7 +234,7 @@ impl ProviderService {
 
             // Execute tool calls
             let results = self.execute_tool_calls(&response.tool_calls).await;
-            
+
             // Log tool executions
             for (call, result) in response.tool_calls.iter().zip(results.iter()) {
                 info!(
@@ -354,9 +361,9 @@ impl ProviderService {
 
     fn parse_response(&self, choice: &ChatChoice) -> Result<CompletionResponse> {
         let message = &choice.message;
-        
+
         let content = message.content.clone();
-        
+
         let tool_calls: Vec<ToolCall> = message
             .tool_calls
             .as_ref()
@@ -442,7 +449,7 @@ mod tests {
     fn test_tool_registry() {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(EchoTool));
-        
+
         assert!(!registry.is_empty());
         assert_eq!(registry.get_tools().len(), 1);
     }
@@ -451,10 +458,12 @@ mod tests {
     fn test_echo_tool() {
         let tool = EchoTool;
         let def = tool.definition();
-        
+
         assert_eq!(def.function.name, "echo");
-        
-        let result = tool.execute(serde_json::json!({ "message": "hello" })).unwrap();
+
+        let result = tool
+            .execute(serde_json::json!({ "message": "hello" }))
+            .unwrap();
         assert_eq!(result["echoed"], "hello");
     }
 }

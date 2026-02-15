@@ -10,7 +10,7 @@ pub struct MCPConfig {
     /// Global startup timeout in seconds
     #[serde(default = "default_startup_timeout")]
     pub startup_timeout: u64,
-    
+
     /// MCP server configurations
     #[serde(default)]
     pub servers: HashMap<String, MCPServerConfig>,
@@ -35,13 +35,13 @@ impl Default for MCPConfig {
 pub enum MCPServerConfig {
     /// Simple form: just a command string or URL
     Simple(String),
-    
+
     /// Advanced form with explicit transport and options
     Advanced {
         /// Transport configuration
         #[serde(flatten)]
         transport: TransportConfig,
-        
+
         /// Override global startup timeout
         #[serde(default)]
         startup_timeout: Option<u64>,
@@ -57,12 +57,12 @@ pub enum TransportConfig {
         /// Command to execute
         command: String,
     },
-    
+
     /// HTTP transport (SSE or streaming)
     HTTP {
         /// Server URL
         url: String,
-        
+
         /// Optional HTTP headers
         #[serde(default)]
         headers: HashMap<String, String>,
@@ -80,7 +80,7 @@ pub enum TransportType {
 
 impl MCPServerConfig {
     /// Detect transport type from configuration
-    #[must_use] 
+    #[must_use]
     pub fn detect_transport(&self) -> TransportType {
         match self {
             MCPServerConfig::Simple(s) => {
@@ -90,27 +90,23 @@ impl MCPServerConfig {
                     TransportType::Stdio(s.clone())
                 }
             }
-            MCPServerConfig::Advanced { transport, .. } => {
-                match transport {
-                    TransportConfig::Stdio { command } => {
-                        TransportType::Stdio(command.clone())
-                    }
-                    TransportConfig::HTTP { url, headers } => {
-                        TransportType::HTTP(url.clone(), headers.clone())
-                    }
+            MCPServerConfig::Advanced { transport, .. } => match transport {
+                TransportConfig::Stdio { command } => TransportType::Stdio(command.clone()),
+                TransportConfig::HTTP { url, headers } => {
+                    TransportType::HTTP(url.clone(), headers.clone())
                 }
-            }
+            },
         }
     }
-    
+
     /// Get startup timeout (with fallback to global default)
-    #[must_use] 
+    #[must_use]
     pub fn get_timeout(&self, global_timeout: u64) -> Duration {
         match self {
             MCPServerConfig::Simple(_) => Duration::from_secs(global_timeout),
-            MCPServerConfig::Advanced { startup_timeout, .. } => {
-                Duration::from_secs(startup_timeout.unwrap_or(global_timeout))
-            }
+            MCPServerConfig::Advanced {
+                startup_timeout, ..
+            } => Duration::from_secs(startup_timeout.unwrap_or(global_timeout)),
         }
     }
 }

@@ -27,7 +27,12 @@ impl User {
         }
     }
 
-    pub fn with_telegram(id: i64, username: Option<String>, first_name: Option<String>, last_name: Option<String>) -> Self {
+    pub fn with_telegram(
+        id: i64,
+        username: Option<String>,
+        first_name: Option<String>,
+        last_name: Option<String>,
+    ) -> Self {
         Self {
             id,
             telegram_user_id: id,

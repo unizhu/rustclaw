@@ -36,18 +36,14 @@ pub struct MCPClient {
 
 impl MCPClient {
     /// Start an MCP server and connect to it
-    /// 
+    ///
     /// # Errors
     /// Returns an error if the server fails to start or times out
-    pub async fn start(
-        name: String,
-        config: &MCPServerConfig,
-        timeout: Duration,
-    ) -> Result<Self> {
+    pub async fn start(name: String, config: &MCPServerConfig, timeout: Duration) -> Result<Self> {
         info!("Starting MCP server '{}' with timeout {:?}", name, timeout);
-        
+
         let transport_type = config.detect_transport();
-        
+
         let client = match transport_type {
             TransportType::Stdio(command_str) => {
                 Self::start_stdio(&name, &command_str, timeout).await?
@@ -65,41 +61,39 @@ impl MCPClient {
                 }
             }
         };
-        
+
         Ok(client)
     }
-    
+
     /// Start stdio transport
     async fn start_stdio(name: &str, command_str: &str, _timeout: Duration) -> Result<Self> {
         debug!("Starting stdio transport: {}", command_str);
-        
+
         // Parse command string into program and args
         let parts: Vec<&str> = command_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(MCPError::Config("Empty command".into()));
         }
-        
+
         let program = parts[0];
         let args = &parts[1..];
-        
+
         // Try to spawn the process
         let mut cmd = TokioCommand::new(program);
         cmd.args(args);
-        
+
         // Attempt to spawn the process
-        let child = cmd.spawn().map_err(|e| {
-            MCPError::StartupFailed {
-                server: name.into(),
-                reason: format!("Failed to spawn '{}': {}", program, e),
-            }
+        let child = cmd.spawn().map_err(|e| MCPError::StartupFailed {
+            server: name.into(),
+            reason: format!("Failed to spawn '{}': {}", program, e),
         })?;
-        
+
         // Wait a bit to see if the process stays alive
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        
+
         // Initialize client (simulated)
         info!("MCP server '{}' started (simulated)", name);
-        
+
         Ok(Self {
             name: name.into(),
             tools: Vec::new(), // Will be populated when we integrate rmcp
@@ -107,11 +101,11 @@ impl MCPClient {
             process: Some(child),
         })
     }
-    
+
     /// Call a tool on this MCP server
     pub async fn call_tool(&self, tool_name: &str, _args: Value) -> Result<Value> {
         debug!("Calling tool '{}' on server '{}'", tool_name, self.name);
-        
+
         // Simulated for now - will implement with rmcp
         Err(MCPError::Protocol(
             "Tool calls not yet implemented - awaiting rmcp integration".into(),

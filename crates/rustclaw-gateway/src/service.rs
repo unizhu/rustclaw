@@ -1,6 +1,6 @@
 use crate::config::Config;
 use anyhow::Result;
-use rustclaw_channel::{create_default_tools, TelegramService};
+use rustclaw_channel::{TelegramService, create_default_tools};
 use rustclaw_mcp::MCPToolRegistry;
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
@@ -46,7 +46,10 @@ impl GatewayService {
                     if base_url.is_empty() {
                         Provider::openai(&self.config.providers.openai.model)
                     } else {
-                        Provider::openai_with_base_url(&self.config.providers.openai.model, base_url)
+                        Provider::openai_with_base_url(
+                            &self.config.providers.openai.model,
+                            base_url,
+                        )
                     }
                 } else {
                     Provider::openai(&self.config.providers.openai.model)
@@ -71,11 +74,11 @@ impl GatewayService {
 
         // Start MCP servers asynchronously (non-blocking)
         let mcp_registry = Arc::new(RwLock::new(MCPToolRegistry::new()));
-        
+
         if !self.config.mcp.servers.is_empty() {
             let mcp_config = self.config.mcp.clone();
             let mcp_registry_clone = Arc::clone(&mcp_registry);
-            
+
             tokio::spawn(async move {
                 info!("Starting MCP servers in background...");
                 let registry = MCPToolRegistry::start_all(&mcp_config).await;
@@ -106,7 +109,7 @@ impl GatewayService {
                  3. Tool arguments must be pure JSON with no extra formatting \
                  4. Wait for the tool result before continuing \
                  \
-                 Always be helpful and provide clear explanations."
+                 Always be helpful and provide clear explanations.",
             );
         info!("Provider service initialized");
 
