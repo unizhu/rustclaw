@@ -1,0 +1,373 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      build_targets:
+        description: 'Build targets (all, linux, macos, windows)'
+        required: false
+        default: 'all'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Determine which targets to build based on commit message or workflow input
+  determine-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      build_linux: ${{ steps.set-matrix.outputs.build_linux }}
+      build_macos: ${{ steps.set-matrix.outputs.build_macos }}
+      build_windows: ${{ steps.set-matrix.outputs.build_windows }}
+      should_release: ${{ steps.set-matrix.outputs.should_release }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Get commit message
+      id: commit
+      run: echo "message=$(git log -1 --pretty=%B ${{ github.event.after }})" >> $GITHUB_OUTPUT
+    
+    - name: Determine build targets
+      id: set-matrix
+      run: |
+        COMMIT_MSG="${{ steps.commit.outputs.message }}"
+        INPUT_TARGET="${{ github.event.inputs.build_targets }}"
+        
+        # Default: build all
+        BUILD_LINUX="true"
+        BUILD_MACOS="true"
+        BUILD_WINDOWS="true"
+        SHOULD_RELEASE="false"
+        
+        # Check for tag push (release)
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          SHOULD_RELEASE="true"
+          echo "📦 Tag detected - will create release"
+        fi
+        
+        # Check commit message for CI directives
+        if [[ "$COMMIT_MSG" == *"[ci-linux]"* ]]; then
+          BUILD_MACOS="false"
+          BUILD_WINDOWS="false"
+          echo "🐧 Building Linux only (ci-linux directive)"
+        elif [[ "$COMMIT_MSG" == *"[ci-macos]"* ]]; then
+          BUILD_LINUX="false"
+          BUILD_WINDOWS="false"
+          echo "🍎 Building macOS only (ci-macos directive)"
+        elif [[ "$COMMIT_MSG" == *"[ci-windows]"* ]]; then
+          BUILD_LINUX="false"
+          BUILD_MACOS="false"
+          echo "🪟 Building Windows only (ci-windows directive)"
+        elif [[ "$COMMIT_MSG" == *"[ci-all]"* ]]; then
+          echo "🌍 Building all platforms (ci-all directive)"
+        fi
+        
+        # Override with manual input if provided
+        if [ -n "$INPUT_TARGET" ]; then
+          case "$INPUT_TARGET" in
+            linux)
+              BUILD_LINUX="true"
+              BUILD_MACOS="false"
+              BUILD_WINDOWS="false"
+              ;;
+            macos)
+              BUILD_LINUX="false"
+              BUILD_MACOS="true"
+              BUILD_WINDOWS="false"
+              ;;
+            windows)
+              BUILD_LINUX="false"
+              BUILD_MACOS="false"
+              BUILD_WINDOWS="true"
+              ;;
+            all)
+              BUILD_LINUX="true"
+              BUILD_MACOS="true"
+              BUILD_WINDOWS="true"
+              ;;
+          esac
+          echo "manual input: $INPUT_TARGET"
+        fi
+        
+        echo "build_linux=$BUILD_LINUX" >> $GITHUB_OUTPUT
+        echo "build_macos=$BUILD_MACOS" >> $GITHUB_OUTPUT
+        echo "build_windows=$BUILD_WINDOWS" >> $GITHUB_OUTPUT
+        echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+
+  # Build for Linux (x86_64 and aarch64)
+  build-linux:
+    needs: determine-targets
+    if: needs.determine-targets.outputs.build_linux == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Install cross
+      run: cargo install cross
+    
+    - name: Build binary
+      run: |
+        cross build --release --target ${{ matrix.target }}
+        
+        # Prepare binary
+        cd target/${{ matrix.target }}/release
+        BINARY_NAME="rustclaw-gateway"
+        
+        if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
+          ARCH="amd64"
+        else
+          ARCH="arm64"
+        fi
+        
+        tar -czf rustclaw-${{ matrix.target }}.tar.gz $BINARY_NAME
+        mv rustclaw-${{ matrix.target }}.tar.gz ${{ github.workspace }}/
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustclaw-${{ matrix.target }}
+        path: rustclaw-${{ matrix.target }}.tar.gz
+        retention-days: 7
+
+  # Build for macOS (x86_64 and aarch64)
+  build-macos:
+    needs: determine-targets
+    if: needs.determine-targets.outputs.build_macos == 'true'
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Build binary
+      run: |
+        cargo build --release --target ${{ matrix.target }}
+        
+        # Prepare binary
+        cd target/${{ matrix.target }}/release
+        BINARY_NAME="rustclaw-gateway"
+        
+        tar -czf rustclaw-${{ matrix.target }}.tar.gz $BINARY_NAME
+        mv rustclaw-${{ matrix.target }}.tar.gz ${{ github.workspace }}/
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustclaw-${{ matrix.target }}
+        path: rustclaw-${{ matrix.target }}.tar.gz
+        retention-days: 7
+
+  # Build for Windows (x86_64)
+  build-windows:
+    needs: determine-targets
+    if: needs.determine-targets.outputs.build_windows == 'true'
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-pc-windows-msvc
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Build binary
+      run: |
+        cargo build --release --target ${{ matrix.target }}
+        
+        cd target/${{ matrix.target }}/release
+        $BINARY_NAME = "rustclaw-gateway.exe"
+        
+        Compress-Archive -Path $BINARY_NAME -DestinationPath rustclaw-${{ matrix.target }}.zip
+        Move-Item rustclaw-${{ matrix.target }}.zip ${{ github.workspace }}/
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustclaw-${{ matrix.target }}
+        path: rustclaw-${{ matrix.target }}.zip
+        retention-days: 7
+
+  # Build for Windows ARM64 using cross-compilation
+  build-windows-arm64:
+    needs: determine-targets
+    if: needs.determine-targets.outputs.build_windows == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-pc-windows-msvc
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Install cross
+      run: cargo install cross
+    
+    - name: Build binary
+      run: |
+        cross build --release --target ${{ matrix.target }}
+        
+        cd target/${{ matrix.target }}/release
+        BINARY_NAME="rustclaw-gateway.exe"
+        
+        zip rustclaw-${{ matrix.target }}.zip $BINARY_NAME
+        mv rustclaw-${{ matrix.target }}.zip ${{ github.workspace }}/
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustclaw-${{ matrix.target }}
+        path: rustclaw-${{ matrix.target }}.zip
+        retention-days: 7
+
+  # Run tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo index
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache target directory
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Run tests
+      run: cargo test --all-features --workspace
+    
+    - name: Check formatting
+      run: cargo fmt -- --check
+    
+    - name: Clippy
+      run: cargo clippy --all-features --workspace -- -D warnings
+
+  # Create release
+  create-release:
+    needs: [determine-targets, build-linux, build-macos, build-windows, build-windows-arm64, test]
+    if: needs.determine-targets.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version from Cargo.toml
+      id: version
+      run: |
+        VERSION=$(grep -m 1 'version = "' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+        echo "📦 Version: $VERSION"
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Display structure of downloaded files
+      run: ls -R artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.tag }}
+        name: Release ${{ steps.version.outputs.tag }}
+        body: |
+          ## 🚀 Release ${{ steps.version.outputs.version }}
+          
+          ### Binaries
+          - **Linux x86_64**: rustclaw-x86_64-unknown-linux-gnu.tar.gz
+          - **Linux ARM64**: rustclaw-aarch64-unknown-linux-gnu.tar.gz
+          - **macOS Intel**: rustclaw-x86_64-apple-darwin.tar.gz
+          - **macOS Apple Silicon**: rustclaw-aarch64-apple-darwin.tar.gz
+          - **Windows x86_64**: rustclaw-x86_64-pc-windows-msvc.zip
+          - **Windows ARM64**: rustclaw-aarch64-pc-windows-msvc.zip
+          
+          ### Installation
+          
+          #### Linux/macOS
+          ```bash
+          # Download and extract
+          tar -xzf rustclaw-<target>.tar.gz
+          chmod +x rustclaw-gateway
+          sudo mv rustclaw-gateway /usr/local/bin/
+          ```
+          
+          #### Windows
+          Extract the zip file and add the executable to your PATH.
+          
+          ### Changes
+          See [CHANGELOG.md](CHANGELOG.md) for details.
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          artifacts/*/rustclaw-*.tar.gz
+          artifacts/*/rustclaw-*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
