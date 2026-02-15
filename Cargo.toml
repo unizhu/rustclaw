@@ -60,3 +60,6 @@ async-openai = "0.27"
 
 # UUID
 uuid = { version = "1.11", features = ["v4", "serde"] }
+
+# MCP
+rmcp = { version = "0.1", features = ["client"] }

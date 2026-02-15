@@ -7,7 +7,7 @@ license.workspace = true
 
 [dependencies]
 # MCP SDK
-rmcp = { version = "0.1", features = ["client"] }
+rmcp = { workspace = true }
 
 # Internal crates
 rustclaw-types = { path = "../rustclaw-types" }
