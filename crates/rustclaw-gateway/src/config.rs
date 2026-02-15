@@ -30,6 +30,13 @@ path = "rustclaw.db"
 
 [logging]
 level = "info"  # trace, debug, info, warn, error
+
+# MCP servers (optional)
+[mcp]
+startup_timeout = 10  # seconds
+
+[mcp.servers]
+# Example: filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
 "#;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -105,6 +112,8 @@ pub struct Config {
     pub agent: AgentConfig,
     pub database: DatabaseConfig,
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub mcp: rustclaw_mcp::MCPConfig,
 }
 
 impl Config {
