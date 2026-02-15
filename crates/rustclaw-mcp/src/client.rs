@@ -48,13 +48,14 @@ impl MCPClient {
             TransportType::Stdio(command_str) => {
                 Self::start_stdio(&name, &command_str, timeout).await?
             }
-            TransportType::HTTP(_url, _headers) => {
+            TransportType::HTTP(url, _headers) => {
                 #[cfg(feature = "http")]
                 {
-                    Self::start_http(&name, &_url, timeout)?
+                    Self::start_http(&name, &url, timeout)?
                 }
                 #[cfg(not(feature = "http"))]
                 {
+                    let _ = url; // Silence unused variable warning
                     return Err(MCPError::Config(
                         "HTTP transport requires 'http' feature".into(),
                     ));
