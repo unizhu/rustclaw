@@ -1,6 +1,6 @@
 use crate::config::Config;
 use anyhow::Result;
-use rustclaw_channel::TelegramService;
+use rustclaw_channel::{create_default_tools, TelegramService};
 use rustclaw_logging;
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
@@ -33,7 +33,11 @@ impl GatewayService {
         let provider = match self.config.providers.default.as_str() {
             "openai" => {
                 if let Some(base_url) = &self.config.providers.openai.base_url {
-                    Provider::openai_with_base_url(&self.config.providers.openai.model, base_url)
+                    if base_url.is_empty() {
+                        Provider::openai(&self.config.providers.openai.model)
+                    } else {
+                        Provider::openai_with_base_url(&self.config.providers.openai.model, base_url)
+                    }
                 } else {
                     Provider::openai(&self.config.providers.openai.model)
                 }
@@ -47,7 +51,22 @@ impl GatewayService {
                 Provider::default()
             }
         };
-        let provider_service = ProviderService::new(provider);
+
+        // Create tool registry with default tools (bash, file ops, etc.)
+        let tools = create_default_tools();
+        info!(
+            "Tool registry initialized with {} tools",
+            tools.get_tools().len()
+        );
+
+        // Create provider service with tools
+        let provider_service = ProviderService::with_tools(provider, tools)
+            .with_system_prompt(
+                "You are a helpful AI assistant. You have access to tools for executing \
+                 bash commands, reading files, and listing directories. Use these tools \
+                 when the user asks you to perform system operations. Always be helpful \
+                 and provide clear explanations."
+            );
         info!("Provider service initialized");
 
         // Initialize Telegram channel

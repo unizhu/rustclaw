@@ -1,6 +1,6 @@
 use anyhow::Result;
-use rustclaw_types::{Message, User};
-use sqlx::{Row, SqlitePool};
+use rustclaw_types::{Message, MessageContent, User};
+use sqlx::SqlitePool;
 use tracing::info;
 
 /// Persistence service for storing data in SQLite
@@ -80,7 +80,7 @@ impl PersistenceService {
 
         // Then save the message
         let content = match &message.content {
-            rustclaw_types::MessageContent::Text(text) => text,
+            MessageContent::Text(text) => text,
         };
 
         sqlx::query(
@@ -129,21 +129,24 @@ impl PersistenceService {
         let messages = rows
             .iter()
             .map(|row| {
-                use rustclaw_types::{Id, MessageContent};
+                use sqlx::Row;
+                let timestamp_str: String = row.get("timestamp");
+                let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp_str)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| chrono::Utc::now());
+                
                 Message {
-                    id: Id::default(), // We'll parse from string
+                    id: row.get("message_id"),
                     chat_id: row.get("chat_id"),
                     sender: User {
-                        id: Id::default(),
+                        id: row.get::<String, _>("user_id").parse().unwrap_or(0),
                         telegram_user_id: row.get("telegram_user_id"),
                         username: row.get("username"),
                         first_name: row.get("first_name"),
                         last_name: row.get("last_name"),
                     },
                     content: MessageContent::Text(row.get("content")),
-                    timestamp: chrono::DateTime::parse_from_rfc3339(row.get("timestamp"))
-                        .unwrap()
-                        .with_timezone(&chrono::Utc),
+                    timestamp,
                 }
             })
             .collect();

@@ -133,6 +133,66 @@ RustClaw uses a service-oriented architecture with Tokio channels for communicat
     └────────────────────────────────────────────┘
 ```
 
+## Tool Calling
+
+RustClaw supports OpenAI-compatible function calling (tool calling). You can register custom tools that the model can call:
+
+### Defining a Tool
+
+```rust
+use rustclaw_provider::{ToolFunction, ToolRegistry, ProviderService};
+use rustclaw_types::Tool;
+use anyhow::Result;
+
+// Define a custom tool
+pub struct WeatherTool;
+
+impl ToolFunction for WeatherTool {
+    fn definition(&self) -> Tool {
+        Tool::function(
+            "get_weather",
+            "Get current weather for a location",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "City and country, e.g. 'Paris, France'"
+                    }
+                },
+                "required": ["location"],
+                "additionalProperties": false
+            }),
+        )
+    }
+
+    fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
+        let location = args["location"].as_str().unwrap();
+        // Your weather API logic here
+        Ok(serde_json::json!({
+            "location": location,
+            "temperature": "22°C",
+            "condition": "sunny"
+        }))
+    }
+}
+
+// Register tools
+let mut registry = ToolRegistry::new();
+registry.register(Box::new(WeatherTool));
+
+// Create provider with tools
+let service = ProviderService::with_tools(provider, registry);
+
+// Use agentic loop for automatic tool execution
+let response = service.complete_agentic(&messages, "What's the weather in Paris?", 5).await?;
+```
+
+### Built-in Tools
+
+- `EchoTool` - Simple echo for testing
+- `CurrentTimeTool` - Get current date/time
+
 ## Development
 
 ```bash
@@ -187,13 +247,14 @@ docker run -d \
 
 ## Roadmap
 
+- [x] OpenAI-compatible tool calling support
 - [ ] Additional channels (Slack, Discord)
 - [ ] Web UI for management
 - [ ] Conversation export/import
 - [ ] Multi-tenancy support
 - [ ] Metrics and monitoring
 - [ ] Hot configuration reload
-- [ ] Plugin/skill system
+- [ ] Plugin/skill system with dynamic loading
 
 ## License
 
