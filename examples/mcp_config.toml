@@ -32,11 +32,5 @@ filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
 # GitHub MCP server (requires GITHUB_TOKEN env var)
 # github = "mcp-server-github"
 
-# Custom MCP server with timeout override
-# slow_server = { 
-#   command = "my-slow-server --port 8080",
-#   startup_timeout = 30
-# }
-
 # HTTP-based MCP server (SSE transport)
 # weather = "http://localhost:3000/sse"

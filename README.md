@@ -249,6 +249,7 @@ docker run -d \
 ## Roadmap
 
 - [x] OpenAI-compatible tool calling support
+- [x] MCP (Model Context Protocol) client support
 - [ ] Additional channels (Slack, Discord)
 - [ ] Web UI for management
 - [ ] Conversation export/import
