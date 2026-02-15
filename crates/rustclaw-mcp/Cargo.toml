@@ -11,6 +11,7 @@ rmcp = { workspace = true }
 
 # Internal crates
 rustclaw-types = { path = "../rustclaw-types" }
+rustclaw-provider = { path = "../rustclaw-provider" }
 
 # Async runtime
 tokio = { workspace = true, features = ["process", "time", "sync", "rt-multi-thread"] }

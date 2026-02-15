@@ -7,10 +7,11 @@ pub mod context;
 
 use anyhow::{anyhow, Result};
 use async_openai::config::OpenAIConfig;
-use async_openai::types::{
+use async_openai::types::chat::{
     ChatChoice, ChatCompletionRequestSystemMessageArgs,
-    ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolArgs,
-    ChatCompletionToolType, CreateChatCompletionRequestArgs,
+    ChatCompletionRequestUserMessageArgs, ChatCompletionTools, ChatCompletionTool,
+    CreateChatCompletionRequestArgs, ChatCompletionRequestMessage,
+    ChatCompletionRequestToolMessageArgs, FunctionObject, ChatCompletionMessageToolCalls,
 };
 use async_openai::Client;
 use rustclaw_types::{CompletionResponse, Message, MessageContent, Provider, Tool, ToolCall, ToolResult};
@@ -104,29 +105,25 @@ pub struct ProviderService {
 }
 
 impl ProviderService {
-    /// Create a new provider service without tools
+    /// Create a new provider service
     pub fn new(provider: Provider) -> Self {
         Self {
             provider,
             tools: ToolRegistry::new(),
-            system_prompt: "You are a helpful AI assistant.".to_string(),
-            max_tool_iterations: 5,
-        }
-    }
-
-    /// Create a new provider service with tools
-    pub fn with_tools(provider: Provider, tools: ToolRegistry) -> Self {
-        Self {
-            provider,
-            tools,
-            system_prompt: "You are a helpful AI assistant.".to_string(),
-            max_tool_iterations: 5,
+            system_prompt: "You are a helpful assistant.".to_string(),
+            max_tool_iterations: 10,
         }
     }
 
     /// Set the system prompt
     pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.system_prompt = prompt.into();
+        self
+    }
+
+    /// Set tool registry directly
+    pub fn with_tool_registry(mut self, registry: ToolRegistry) -> Self {
+        self.tools = registry;
         self
     }
 
@@ -214,7 +211,7 @@ impl ProviderService {
         max_iterations: usize,
     ) -> Result<String> {
         let current_messages = messages.to_vec();
-        let mut current_prompt = prompt.to_string();
+        let current_prompt = prompt.to_string();
         let mut tool_results = None;
 
         for iteration in 0..max_iterations {
@@ -246,15 +243,10 @@ impl ProviderService {
 
             // Prepare for next iteration
             tool_results = Some(results);
-            
-            // Clear prompt for subsequent iterations (already in context)
-            if iteration > 0 {
-                current_prompt = String::new();
-            }
         }
 
-        warn!("Max tool iterations reached");
-        Ok("I've reached the maximum number of tool operations. Please let me know if you need me to continue.".to_string())
+        warn!("Max tool iterations reached without final response");
+        Ok("[Max tool iterations reached]".to_string())
     }
 
     // ========================================================================
@@ -296,7 +288,7 @@ impl ProviderService {
         messages: &[Message],
         prompt: &str,
         tool_results: Option<Vec<ToolResult>>,
-    ) -> Result<Vec<async_openai::types::ChatCompletionRequestMessage>> {
+    ) -> Result<Vec<ChatCompletionRequestMessage>> {
         let mut chat_messages = vec![
             ChatCompletionRequestSystemMessageArgs::default()
                 .content(self.system_prompt.clone())
@@ -331,7 +323,7 @@ impl ProviderService {
         if let Some(results) = tool_results {
             for result in results {
                 chat_messages.push(
-                    async_openai::types::ChatCompletionRequestToolMessageArgs::default()
+                    ChatCompletionRequestToolMessageArgs::default()
                         .content(result.output.clone())
                         .tool_call_id(result.tool_call_id.clone())
                         .build()?
@@ -343,20 +335,19 @@ impl ProviderService {
         Ok(chat_messages)
     }
 
-    fn build_tools_for_api(&self) -> Result<Vec<ChatCompletionTool>> {
+    fn build_tools_for_api(&self) -> Result<Vec<ChatCompletionTools>> {
         self.tools
             .get_tools()
             .into_iter()
             .map(|tool| {
-                Ok(ChatCompletionToolArgs::default()
-                    .r#type(ChatCompletionToolType::Function)
-                    .function(async_openai::types::FunctionObject {
+                Ok(ChatCompletionTools::Function(ChatCompletionTool {
+                    function: FunctionObject {
                         name: tool.function.name,
                         description: Some(tool.function.description),
                         parameters: Some(tool.function.parameters),
                         strict: tool.function.strict,
-                    })
-                    .build()?)
+                    },
+                }))
             })
             .collect()
     }
@@ -372,13 +363,16 @@ impl ProviderService {
             .map(|calls| {
                 calls
                     .iter()
-                    .map(|tc| ToolCall {
-                        id: tc.id.clone(),
-                        call_type: "function".to_string(),
-                        function: rustclaw_types::FunctionCall {
-                            name: tc.function.name.clone(),
-                            arguments: tc.function.arguments.clone(),
-                        },
+                    .filter_map(|tc| match tc {
+                        ChatCompletionMessageToolCalls::Function(func_call) => Some(ToolCall {
+                            id: func_call.id.clone(),
+                            call_type: "function".to_string(),
+                            function: rustclaw_types::FunctionCall {
+                                name: func_call.function.name.clone(),
+                                arguments: func_call.function.arguments.clone(),
+                            },
+                        }),
+                        ChatCompletionMessageToolCalls::Custom(_) => None,
                     })
                     .collect()
             })
@@ -440,38 +434,6 @@ impl ToolFunction for EchoTool {
     }
 }
 
-/// Current time tool
-pub struct CurrentTimeTool;
-
-impl ToolFunction for CurrentTimeTool {
-    fn definition(&self) -> Tool {
-        Tool::function(
-            "get_current_time",
-            "Get the current date and time",
-            serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "timezone": {
-                        "type": "string",
-                        "description": "Optional timezone (e.g., 'UTC', 'America/New_York')"
-                    }
-                },
-                "required": [],
-                "additionalProperties": false
-            }),
-        )
-    }
-
-    fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        let _tz = args.get("timezone").and_then(|t| t.as_str()).unwrap_or("UTC");
-        let now = chrono::Utc::now();
-        Ok(serde_json::json!({
-            "time": now.to_rfc3339(),
-            "timezone": "UTC"
-        }))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,22 +443,18 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(EchoTool));
         
-        let tools = registry.get_tools();
-        assert_eq!(tools.len(), 1);
-        assert_eq!(tools[0].function.name, "echo");
+        assert!(!registry.is_empty());
+        assert_eq!(registry.get_tools().len(), 1);
     }
 
     #[test]
     fn test_echo_tool() {
         let tool = EchoTool;
-        let result = tool.execute(serde_json::json!({"message": "hello"})).unwrap();
+        let def = tool.definition();
+        
+        assert_eq!(def.function.name, "echo");
+        
+        let result = tool.execute(serde_json::json!({ "message": "hello" })).unwrap();
         assert_eq!(result["echoed"], "hello");
-    }
-
-    #[test]
-    fn test_time_tool() {
-        let tool = CurrentTimeTool;
-        let result = tool.execute(serde_json::json!({})).unwrap();
-        assert!(result.get("time").is_some());
     }
 }

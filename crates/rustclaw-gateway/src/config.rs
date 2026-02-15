@@ -182,11 +182,10 @@ impl Config {
         }
 
         // Agent config overrides
-        if let Ok(iterations) = env::var("RUSTCLAW_MAX_TOOL_ITERATIONS") {
-            if let Ok(v) = iterations.parse::<i64>() {
+        if let Ok(iterations) = env::var("RUSTCLAW_MAX_TOOL_ITERATIONS")
+            && let Ok(v) = iterations.parse::<i64>() {
                 builder = builder.set_override("agent__max_tool_iterations", v)?;
             }
-        }
 
         let config = builder.build()?;
         let config: Self = config.try_deserialize()?;

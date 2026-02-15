@@ -5,7 +5,10 @@ use crate::error::{MCPError, Result};
 use serde_json::Value;
 use std::time::Duration;
 use tokio::process::Command as TokioCommand;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
+
+#[cfg(feature = "http")]
+use tracing::warn;
 
 /// MCP tool definition
 #[derive(Debug, Clone)]
@@ -33,6 +36,9 @@ pub struct MCPClient {
 
 impl MCPClient {
     /// Start an MCP server and connect to it
+    /// 
+    /// # Errors
+    /// Returns an error if the server fails to start or times out
     pub async fn start(
         name: String,
         config: &MCPServerConfig,
@@ -46,10 +52,10 @@ impl MCPClient {
             TransportType::Stdio(command_str) => {
                 Self::start_stdio(&name, &command_str, timeout).await?
             }
-            TransportType::HTTP(url, _headers) => {
+            TransportType::HTTP(_url, _headers) => {
                 #[cfg(feature = "http")]
                 {
-                    Self::start_http(&name, &url, timeout).await?
+                    Self::start_http(&name, &_url, timeout).await?
                 }
                 #[cfg(not(feature = "http"))]
                 {
@@ -89,7 +95,7 @@ impl MCPClient {
             async {
                 // Simulate process spawn
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                Ok(())
+                Ok::<(), MCPError>(())
             }
         )
         .await
@@ -123,7 +129,7 @@ impl MCPClient {
 /// Placeholder for HTTP transport (will be implemented later)
 #[cfg(feature = "http")]
 impl MCPClient {
-    async fn start_http(name: &str, url: &str, _timeout: Duration) -> Result<Self> {
+    async fn start_http(name: &str, _url: &str, _timeout: Duration) -> Result<Self> {
         warn!("HTTP transport not yet implemented for server '{}'", name);
         Err(MCPError::Config(
             "HTTP transport implementation pending".into(),

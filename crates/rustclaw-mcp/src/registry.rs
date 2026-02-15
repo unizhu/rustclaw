@@ -4,7 +4,6 @@ use crate::client::MCPClient;
 use crate::config::MCPConfig;
 use crate::error::MCPError;
 use crate::tool_bridge::MCPToolWrapper;
-use rustclaw_types::Tool;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,12 +13,13 @@ use tracing::{error, info};
 
 /// Registry of MCP clients and their tools
 pub struct MCPToolRegistry {
-    /// Connected MCP clients (server_name → client)
+    /// Connected MCP clients (`server_name` → client)
     clients: Arc<RwLock<HashMap<String, MCPClient>>>,
 }
 
 impl MCPToolRegistry {
     /// Create an empty registry
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
@@ -43,7 +43,7 @@ impl MCPToolRegistry {
         for (name, server_config) in &config.servers {
             let name = name.clone();
             let config = server_config.clone();
-            let timeout_secs = config.get_timeout(config.startup_timeout).as_secs();
+            let timeout_secs = config.get_timeout(10).as_secs();
             let clients = Arc::clone(&registry.clients);
             
             tasks.spawn(async move {
@@ -99,7 +99,8 @@ impl MCPToolRegistry {
         client.call_tool(tool_name, args).await
     }
     
-    /// Get all tools from all connected servers as ToolFunction wrappers
+    /// Get all tools from all connected servers as `ToolFunction` wrappers
+    #[must_use] 
     pub fn to_tool_functions(&self) -> Vec<Box<dyn rustclaw_provider::ToolFunction>> {
         let clients = self.clients.blocking_read();
         let mut tools = Vec::new();
@@ -122,16 +123,19 @@ impl MCPToolRegistry {
     }
     
     /// Check if registry is empty
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.clients.blocking_read().is_empty()
     }
     
     /// Get number of connected servers
+    #[must_use] 
     pub fn server_count(&self) -> usize {
         self.clients.blocking_read().len()
     }
     
     /// Get total tool count across all servers
+    #[must_use] 
     pub fn tool_count(&self) -> usize {
         self.clients
             .blocking_read()

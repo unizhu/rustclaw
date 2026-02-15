@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use rustclaw_persistence::PersistenceService;
-use rustclaw_provider::{CurrentTimeTool, EchoTool, ProviderService, ToolFunction, ToolRegistry};
+use rustclaw_provider::{EchoTool, ProviderService, ToolFunction, ToolRegistry};
 use rustclaw_types::{Message as RustClawMessage, MessageContent, Tool, User};
 use std::sync::Arc;
 use teloxide::{error_handlers::LoggingErrorHandler, prelude::*, utils::command::BotCommands};
@@ -692,7 +692,6 @@ impl ToolFunction for WriteFileTool {
 pub fn create_default_tools() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(EchoTool));
-    registry.register(Box::new(CurrentTimeTool));
     registry.register(Box::new(BashTool));
     registry.register(Box::new(ReadFileTool));
     registry.register(Box::new(ListDirTool));

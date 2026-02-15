@@ -79,9 +79,7 @@ impl PersistenceService {
         self.save_user(&message.sender).await?;
 
         // Then save the message
-        let content = match &message.content {
-            MessageContent::Text(text) => text,
-        };
+        let MessageContent::Text(content) = &message.content;
 
         sqlx::query(
             r#"

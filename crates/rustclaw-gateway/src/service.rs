@@ -1,7 +1,6 @@
 use crate::config::Config;
 use anyhow::Result;
 use rustclaw_channel::{create_default_tools, TelegramService};
-use rustclaw_logging;
 use rustclaw_mcp::MCPToolRegistry;
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
@@ -64,7 +63,7 @@ impl GatewayService {
         };
 
         // Create tool registry with default tools (bash, file ops, etc.)
-        let mut tools = create_default_tools();
+        let tools = create_default_tools();
         info!(
             "Tool registry initialized with {} built-in tools",
             tools.get_tools().len()
@@ -93,7 +92,8 @@ impl GatewayService {
         }
 
         // Create provider service with tools
-        let provider_service = ProviderService::with_tools(provider, tools)
+        let provider_service = ProviderService::new(provider)
+            .with_tool_registry(tools)
             .with_max_tool_iterations(self.config.agent.max_tool_iterations)
             .with_system_prompt(
                 "You are a helpful AI assistant. You have access to tools for executing \

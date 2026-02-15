@@ -1,6 +1,6 @@
-//! RustClaw MCP Client Library
+//! `RustClaw` MCP Client Library
 //! 
-//! Production-ready MCP (Model Context Protocol) client support for RustClaw.
+//! Production-ready MCP (Model Context Protocol) client support for `RustClaw`.
 //! 
 //! ## Features
 //! 
@@ -24,8 +24,9 @@ pub mod client;
 pub mod registry;
 pub mod tool_bridge;
 
-#[cfg(feature = "http")]
-pub mod transport;
+// TODO: Implement HTTP transport
+// #[cfg(feature = "http")]
+// pub mod transport;
 
 pub use error::MCPError;
 pub use config::{MCPConfig, MCPServerConfig, TransportConfig};

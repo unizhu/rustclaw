@@ -80,6 +80,7 @@ pub enum TransportType {
 
 impl MCPServerConfig {
     /// Detect transport type from configuration
+    #[must_use] 
     pub fn detect_transport(&self) -> TransportType {
         match self {
             MCPServerConfig::Simple(s) => {
@@ -103,6 +104,7 @@ impl MCPServerConfig {
     }
     
     /// Get startup timeout (with fallback to global default)
+    #[must_use] 
     pub fn get_timeout(&self, global_timeout: u64) -> Duration {
         match self {
             MCPServerConfig::Simple(_) => Duration::from_secs(global_timeout),

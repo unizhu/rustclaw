@@ -11,28 +11,28 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
-edition = "2021"
+version = "0.1.1"
+edition = "2024"
 authors = ["UGENT"]
 license = "MIT"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.42", features = ["full"] }
-tokio-stream = "0.1"
-tokio-util = { version = "0.7", features = ["rt"] }
+tokio = { version = "1.49", features = ["full"] }
+tokio-stream = "0.1.18"
+tokio-util = { version = "0.7.18", features = ["rt"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-toml = "0.8"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+toml = "1.0.1"
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 
 # MCP client
-rmcp = { version = "0.1", features = ["client"] }
+rmcp = { version = "0.15", features = ["client"] }
 
 # Error handling
 anyhow = "1.0"
@@ -50,19 +50,13 @@ dotenvy = "0.15"
 dirs = "5.0"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
 
 # Telegram
-teloxide = { version = "0.13", features = ["macros"] }
+teloxide = { version = "0.17", features = ["macros"] }
 
 # LLM
-async-openai = "0.27"
+async-openai = { version = "0.32.4", features = ["chat-completion"] }
 
 # UUID
-uuid = { version = "1.11", features = ["v4", "serde"] }
-
-# MCP SDK
-rmcp = { version = "0.1", features = ["client"] }
-
-# MCP
-rmcp = { version = "0.1", features = ["client"] }
+uuid = { version = "1.21", features = ["v4", "serde"] }
