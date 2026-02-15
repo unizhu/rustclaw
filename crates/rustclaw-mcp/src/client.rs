@@ -51,7 +51,7 @@ impl MCPClient {
             TransportType::HTTP(_url, _headers) => {
                 #[cfg(feature = "http")]
                 {
-                    Self::start_http(&name, &url, timeout)?
+                    Self::start_http(&name, &_url, timeout)?
                 }
                 #[cfg(not(feature = "http"))]
                 {
