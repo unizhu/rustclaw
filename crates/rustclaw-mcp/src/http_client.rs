@@ -136,19 +136,19 @@ impl StreamableHttpClient for CompatibleHttpClient {
             .map_err(StreamableHttpError::Client)?;
 
         let status = response.status();
-        let ct_str = response
+        let content_type_header = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
             .map(|ct| String::from_utf8_lossy(ct.as_bytes()).to_string());
-        let cl_str = response
+        let content_len_header = response
             .headers()
             .get(reqwest::header::CONTENT_LENGTH)
             .map(|cl| String::from_utf8_lossy(cl.as_bytes()).to_string());
 
         debug!(
             %status,
-            content_type = ?ct_str,
-            content_length = ?cl_str,
+            content_type = ?content_type_header,
+            content_length = ?content_len_header,
             uri = %uri,
             "MCP HTTP response received"
         );
@@ -186,12 +186,12 @@ impl StreamableHttpClient for CompatibleHttpClient {
             .map(std::string::ToString::to_string);
 
         // Compatibility fix: 200 OK with no content-type → Accepted
-        if status == reqwest::StatusCode::OK && ct_str.is_none() {
+        if status == reqwest::StatusCode::OK && content_type_header.is_none() {
             debug!("200 OK with no content-type, treating as Accepted");
             return Ok(StreamableHttpPostResponse::Accepted);
         }
 
-        match &ct_str {
+        match &content_type_header {
             Some(ct) if ct.starts_with(EVENT_STREAM_MIME_TYPE) => {
                 debug!("Routing to SSE path");
                 let event_stream = SseStream::from_byte_stream(response.bytes_stream()).boxed();
@@ -210,11 +210,13 @@ impl StreamableHttpClient for CompatibleHttpClient {
             _ => {
                 let body = response.text().await.unwrap_or_default();
                 tracing::error!(
-                    content_type = ?ct_str,
+                    content_type = ?content_type_header,
                     body_preview = %body.chars().take(200).collect::<String>(),
                     "unexpected content type"
                 );
-                Err(StreamableHttpError::UnexpectedContentType(ct_str))
+                Err(StreamableHttpError::UnexpectedContentType(
+                    content_type_header,
+                ))
             }
         }
     }

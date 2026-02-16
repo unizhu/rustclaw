@@ -80,7 +80,7 @@ impl SkillsRegistry {
     fn scan_directory(&mut self, dir: &Path) -> Result<()> {
         self.scan_directory_recursive(dir, 0)
     }
-    
+
     /// Recursively scan directory and all subdirectories for skills
     fn scan_directory_recursive(&mut self, dir: &Path, depth: usize) -> Result<()> {
         // Safety limit to prevent infinite recursion
@@ -88,7 +88,7 @@ impl SkillsRegistry {
             warn!("Maximum directory depth (10) reached at {:?}", dir);
             return Ok(());
         }
-        
+
         let entries = std::fs::read_dir(dir)
             .with_context(|| format!("Failed to read directory {:?}", dir))?;
 
@@ -112,7 +112,7 @@ impl SkillsRegistry {
                     debug!("No skill in {:?}: {}", path, e);
                 }
             }
-            
+
             // Always recurse into subdirectories to find more skills
             self.scan_directory_recursive(&path, depth + 1)?;
         }

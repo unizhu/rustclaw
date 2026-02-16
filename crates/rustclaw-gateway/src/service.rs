@@ -6,9 +6,8 @@ use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
 use rustclaw_skills::SkillsRegistry;
 use rustclaw_types::Provider;
-use std::sync::Arc;
+
 use tokio::signal;
-use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 /// Gateway service - main orchestrator
@@ -73,27 +72,21 @@ impl GatewayService {
             tools.get_tools().len()
         );
 
-        // Start MCP servers asynchronously (non-blocking)
-        let mcp_registry = Arc::new(RwLock::new(MCPToolRegistry::new()));
+        // Initialize MCP servers and wait for tools
+        let mcp_tools_list = if !self.config.mcp.servers.is_empty() {
+            info!("Initializing MCP servers...");
+            let registry = MCPToolRegistry::start_all(&self.config.mcp).await;
 
-        if !self.config.mcp.servers.is_empty() {
-            let mcp_config = self.config.mcp.clone();
-            let mcp_registry_clone = Arc::clone(&mcp_registry);
+            // Convert to tool functions
+            let tools = registry.to_tool_functions().await;
+            info!("MCP initialized with {} tools", tools.len());
 
-            tokio::spawn(async move {
-                info!("Starting MCP servers in background...");
-                let registry = MCPToolRegistry::start_all(&mcp_config).await;
-                *mcp_registry_clone.write().await = registry;
-            });
-        }
-
-        // Merge MCP tools (will be available once servers start)
-        let mcp_tools = mcp_registry.read().await.to_tool_functions().await;
-        if !mcp_tools.is_empty() {
-            // Note: We need to extend ToolRegistry to accept Box<dyn ToolFunction>
-            // For now, MCP tools will be available once they're integrated
-            info!("MCP servers starting, tools will be available shortly");
-        }
+            // Keep registry for reference if needed (currently we just need tools)
+            // mcp_registry = registry;
+            tools
+        } else {
+            Vec::new()
+        };
 
         // Initialize skills system with progressive disclosure
         let mut skills_registry = SkillsRegistry::new();
@@ -138,10 +131,16 @@ impl GatewayService {
 
         let full_prompt = format!("{}{}", base_prompt, skills_prompt);
 
-        let provider_service = ProviderService::new(provider)
-            .with_tool_registry(tools)
+        // Initialize provider service with ALL tools
+        let mut provider_service = ProviderService::new(provider)
+            .with_tool_registry(tools) // Starts with default tools
             .with_max_tool_iterations(self.config.agent.max_tool_iterations)
             .with_system_prompt(full_prompt);
+
+        // Register MCP tools
+        for tool in mcp_tools_list {
+            provider_service.tools_mut().register(tool);
+        }
         info!("Provider service initialized");
 
         // Initialize Telegram channel
