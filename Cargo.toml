@@ -7,11 +7,12 @@ members = [
     "crates/rustclaw-channel",
     "crates/rustclaw-gateway",
     "crates/rustclaw-mcp",
+    "crates/rustclaw-skills",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["UGENT"]
 license = "MIT"
@@ -25,6 +26,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 # Serialization
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+serde_yaml = "0.9"
 toml = "1.0.1"
 
 # Logging
@@ -48,6 +50,7 @@ futures = "0.3"
 config = "0.14"
 dotenvy = "0.15"
 dirs = "5.0"
+regex = "1.10"
 
 # Database
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "tls-rustls"] }

@@ -37,6 +37,13 @@ startup_timeout = 10  # seconds
 
 [mcp.servers]
 # Example: filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
+
+# Skills directories (optional)
+[skills]
+# Directories to scan for skills (supports multiple)
+# Personal skills: ~/.rustclaw/skills/
+# Project skills: ./.rustclaw/skills/
+directories = ["~/.rustclaw/skills", "./.rustclaw/skills"]
 "#;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -110,6 +117,13 @@ pub struct LoggingConfig {
     pub level: String,
 }
 
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct SkillsConfig {
+    /// Directories to scan for skills
+    #[serde(default)]
+    pub directories: Vec<String>,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub telegram: TelegramConfig,
@@ -120,6 +134,8 @@ pub struct Config {
     pub logging: LoggingConfig,
     #[serde(default)]
     pub mcp: rustclaw_mcp::MCPConfig,
+    #[serde(default)]
+    pub skills: SkillsConfig,
 }
 
 impl Config {

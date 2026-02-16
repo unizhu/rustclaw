@@ -4,6 +4,7 @@ use rustclaw_channel::{create_default_tools, TelegramService};
 use rustclaw_mcp::MCPToolRegistry;
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
+use rustclaw_skills::SkillsRegistry;
 use rustclaw_types::Provider;
 use std::sync::Arc;
 use tokio::signal;
@@ -94,12 +95,36 @@ impl GatewayService {
             info!("MCP servers starting, tools will be available shortly");
         }
 
+        // Initialize skills system with progressive disclosure
+        let mut skills_registry = SkillsRegistry::new();
+
+        // Add configured skills directories
+        for dir in &self.config.skills.directories {
+            // Expand tilde to home directory
+            let expanded_path = if dir.starts_with('~') {
+                if let Some(home) = dirs::home_dir() {
+                    dir.replacen('~', home.to_str().unwrap(), 1)
+                } else {
+                    dir.clone()
+                }
+            } else {
+                dir.clone()
+            };
+            skills_registry = skills_registry.add_directory(expanded_path);
+        }
+
+        // Discover skills (Phase 1: Load metadata only)
+        if let Err(e) = skills_registry.discover() {
+            warn!("Failed to discover skills: {}", e);
+        } else {
+            info!("Discovered {} skills", skills_registry.len());
+        }
+
+        // Generate skills list for system prompt
+        let skills_prompt = skills_registry.generate_system_prompt();
+
         // Create provider service with tools
-        let provider_service = ProviderService::new(provider)
-            .with_tool_registry(tools)
-            .with_max_tool_iterations(self.config.agent.max_tool_iterations)
-            .with_system_prompt(
-                "You are a helpful AI assistant. You have access to tools for executing \
+        let base_prompt = "You are a helpful AI assistant. You have access to tools for executing \
                  bash commands, reading files, and listing directories. Use these tools \
                  when the user asks you to perform system operations. \
                  \
@@ -109,8 +134,14 @@ impl GatewayService {
                  3. Tool arguments must be pure JSON with no extra formatting \
                  4. Wait for the tool result before continuing \
                  \
-                 Always be helpful and provide clear explanations.",
-            );
+                 Always be helpful and provide clear explanations.";
+
+        let full_prompt = format!("{}{}", base_prompt, skills_prompt);
+
+        let provider_service = ProviderService::new(provider)
+            .with_tool_registry(tools)
+            .with_max_tool_iterations(self.config.agent.max_tool_iterations)
+            .with_system_prompt(full_prompt);
         info!("Provider service initialized");
 
         // Initialize Telegram channel

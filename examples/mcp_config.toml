@@ -34,3 +34,11 @@ filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
 
 # HTTP-based MCP server (SSE transport)
 # weather = "http://localhost:3000/sse"
+
+# Skills Configuration
+[skills]
+# Directories to scan for skills (supports multiple)
+# Skills are modular capabilities with progressive disclosure:
+# - Phase 1: Metadata (name, description) loaded at startup
+# - Phase 2: Full content loaded on-demand when matched
+directories = ["~/.rustclaw/skills", "./.rustclaw/skills", "./examples/skills"]

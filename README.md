@@ -7,6 +7,7 @@ A production-ready minimal multi-channel AI gateway written in Rust, inspired by
 - **Telegram Integration**: Chat with your AI assistant via Telegram
 - **Multiple LLM Providers**: Support for OpenAI and Ollama
 - **MCP Integration**: Connect to Model Context Protocol servers for extended tool capabilities
+- **Skills System**: Progressive disclosure architecture for modular AI capabilities (2025-2026 best practices)
 - **SQLite Persistence**: Local-first conversation storage
 - **Structured Logging**: journald/syslog support
 - **Microservices Architecture**: Clean, maintainable codebase
@@ -194,6 +195,67 @@ let response = service.complete_agentic(&messages, "What's the weather in Paris?
 - `EchoTool` - Simple echo for testing
 - `CurrentTimeTool` - Get current date/time
 
+## Skills System
+
+RustClaw features a **progressive disclosure** skills system based on 2025-2026 AI agent research:
+
+### What Are Skills?
+
+Skills are modular capabilities that extend your AI's expertise without bloating context:
+
+- **Phase 1 (Discovery)**: Load skill metadata (name + description) at startup (~50-100 tokens/skill)
+- **Phase 2 (Activation)**: Load full skill content on-demand when task matches
+
+### Creating a Skill
+
+```bash
+mkdir -p ~/.rustclaw/skills/code-reviewer
+```
+
+Create `~/.rustclaw/skills/code-reviewer/SKILL.md`:
+
+```markdown
+---
+name: code-reviewer
+description: Reviews code for best practices. Use when reviewing code.
+---
+
+# Code Reviewer
+
+## Instructions
+
+When reviewing code:
+1. Check for security vulnerabilities
+2. Verify best practices
+3. Suggest improvements
+
+## Output Format
+[Expected output structure]
+```
+
+### Configuring Skills Directories
+
+In `rustclaw.toml`:
+
+```toml
+[skills]
+directories = [
+    "~/.rustclaw/skills",     # Personal skills
+    "./.rustclaw/skills",     # Project skills (shared)
+    "./examples/skills"       # Example skills
+]
+```
+
+### Example Skills
+
+See `examples/skills/` for:
+
+- **code-reviewer** - Code review with best practices
+- **generating-commit-messages** - Conventional commit messages
+- **brainstorming** - Requirements exploration before implementation
+
+For detailed documentation, see [crates/rustclaw-skills/README.md](crates/rustclaw-skills/README.md).
+
 ## Development
 
 ```bash
@@ -250,13 +312,14 @@ docker run -d \
 
 - [x] OpenAI-compatible tool calling support
 - [x] MCP (Model Context Protocol) client support
+- [x] Skills system with progressive disclosure architecture
 - [ ] Additional channels (Slack, Discord)
 - [ ] Web UI for management
 - [ ] Conversation export/import
 - [ ] Multi-tenancy support
 - [ ] Metrics and monitoring
 - [ ] Hot configuration reload
-- [ ] Plugin/skill system with dynamic loading
+- [ ] Dynamic skill loading from plugins
 
 ## License
 
