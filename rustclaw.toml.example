@@ -36,35 +36,74 @@ path = "rustclaw.db"
 [logging]
 level = "info"  # trace, debug, info, warn, error
 
-# MCP Configuration
+# ============================================================================
+# MCP (Model Context Protocol) Configuration
+# ============================================================================
+# MCP servers provide additional tools and capabilities to the AI agent
+# Supports: stdio transport (local commands) and HTTP transport (remote servers)
+
 [mcp]
-startup_timeout = 10  # Global default timeout in seconds
+startup_timeout = 10  # Global default timeout in seconds for MCP server startup
 
 [mcp.servers]
-# Filesystem MCP server (stdio transport)
+# Filesystem MCP server - provides file system access (stdio transport)
+# Usage: Read, write, and manage files in /tmp directory
 filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
 
-# GitHub MCP server (requires GITHUB_TOKEN env var)
+# GitHub MCP server - provides GitHub API access (requires GITHUB_TOKEN env var)
+# Usage: Create issues, PRs, read repositories, etc.
 # github = "mcp-server-github"
 
-# HTTP-based MCP server (Streamable HTTP transport)
+# Simple HTTP-based MCP server (Streamable HTTP transport)
+# Usage: Connect to remote MCP servers over HTTP
 # weather = "http://localhost:3000/mcp"
 
-# Remote MCP server with Bearer token auth
+# Remote MCP server with Bearer token authentication
 # [mcp.servers.web-search]
 # url = "https://open.bigmodel.cn/api/mcp/web_search_prime/mcp"
 # headers = { Authorization = "Bearer your_api_key" }
 
-# Stdio MCP server with explicit args and environment variables
+# Stdio MCP server with explicit command, args, and environment variables
 # [mcp.servers.zai-mcp-server]
 # command = "npx"
 # args = ["-y", "@z_ai/mcp-server"]
 # env = { Z_AI_API_KEY = "your_api_key", Z_AI_MODE = "ZHIPU" }
 
+# ============================================================================
 # Skills Configuration
+# ============================================================================
+# Skills are modular AI capabilities using progressive disclosure (2025-2026 best practices)
+# - Phase 1: Skills metadata (name, description) loaded at startup
+# - Phase 2: Full skill content loaded on-demand when matched
+# - Supports recursive discovery in subdirectories
+# 
+# See examples/skills/ directory for example skills
+
 [skills]
-# Directories to scan for skills (supports multiple)
-# Skills are modular capabilities with progressive disclosure:
-# - Phase 1: Metadata (name, description) loaded at startup
-# - Phase 2: Full content loaded on-demand when matched
+# Directories to scan for skills (supports multiple directories)
+# Skills are Markdown files with frontmatter: name, description, trigger_patterns
 directories = ["~/.rustclaw/skills", "./.rustclaw/skills", "./examples/skills"]
+
+# ============================================================================
+# Example Skills Directory Structure
+# ============================================================================
+# ~/.rustclaw/skills/
+# ├── code-reviewer/
+# │   └── skill.md          # Triggered by "review this code", "code review"
+# ├── commit-messages/
+# │   └── skill.md          # Triggered by "write commit message"
+# ├── testing/
+# │   └── skill.md          # Triggered by "write tests"
+# └── brainstorming/
+#     └── skill.md          # Triggered by "brainstorm", "ideate"
+#
+# Each skill.md contains:
+# ---
+# name: Code Reviewer
+# description: Comprehensive code review with best practices
+# trigger_patterns:
+#   - "review this code"
+#   - "code review"
+#   - "check my code"
+# ---
+# [Skill content in Markdown...]

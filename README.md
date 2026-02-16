@@ -22,21 +22,53 @@ A production-ready minimal multi-channel AI gateway written in Rust, inspired by
 - Telegram Bot Token (from [@BotFather](https://t.me/botfather))
 - OpenAI API Key or Ollama running locally
 
-### Installation
+## Installation
+
+### Quick Install (Recommended)
+
+**macOS/Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/unizhu/rustclaw/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+iex (irm https://raw.githubusercontent.com/unizhu/rustclaw/main/install.ps1)
+```
+
+### Manual Install from Release
+
+Download the latest release for your platform:
+
+- **macOS Intel**: `rustclaw-x86_64-apple-darwin.tar.gz`
+- **macOS Apple Silicon**: `rustclaw-aarch64-apple-darwin.tar.gz` 
+- **Linux x86_64**: `rustclaw-x86_64-unknown-linux-gnu.tar.gz`
+- **Linux ARM64**: `rustclaw-aarch64-unknown-linux-gnu.tar.gz`
+- **Windows x86_64**: `rustclaw-x86_64-pc-windows-msvc.zip`
+
+Then extract and install:
+
+**macOS/Linux:**
+```bash
+tar -xzf rustclaw-<target>.tar.gz
+chmod +x rustclaw-gateway
+sudo mv rustclaw-gateway /usr/local/bin/
+```
+
+**Windows:**
+Extract the zip and add `rustclaw-gateway.exe` to your PATH.
+
+### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/rustclaw.git
+git clone https://github.com/unizhu/rustclaw.git
 cd rustclaw
 
 # Build
 cargo build --release
 
-# Set environment variables (or edit ~/.rustclaw/rustclaw.toml after first run)
-export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
-export OPENAI_API_KEY="your_openai_api_key"
-
-# Run (will auto-create ~/.rustclaw/rustclaw.toml on first run)
+# Run
 ./target/release/rustclaw-gateway
 ```
 
@@ -194,6 +226,58 @@ let response = service.complete_agentic(&messages, "What's the weather in Paris?
 
 - `EchoTool` - Simple echo for testing
 - `CurrentTimeTool` - Get current date/time
+
+## MCP (Model Context Protocol)
+
+RustClaw supports the Model Context Protocol (MCP) for extending AI capabilities with external tools:
+
+### What is MCP?
+
+MCP is an open protocol that enables AI models to interact with external tools and services. It provides:
+
+- **Tool Discovery**: Automatic tool registration
+- **Secure Execution**: Sandboxed tool invocation
+- **Multiple Transports**: stdio (local) and HTTP (remote)
+
+### Configuring MCP Servers
+
+In `rustclaw.toml`:
+
+```toml
+[mcp]
+startup_timeout = 10  # seconds
+
+[mcp.servers]
+# Filesystem access (stdio transport)
+filesystem = "npx -y @modelcontextprotocol/server-filesystem /tmp"
+
+# GitHub API (requires GITHUB_TOKEN env var)
+github = "mcp-server-github"
+
+# Remote server with authentication (HTTP transport)
+[mcp.servers.web-search]
+url = "https://api.example.com/mcp"
+headers = { Authorization = "Bearer your_api_key" }
+
+# With explicit command and environment
+[mcp.servers.custom]
+command = "mcp-server-custom"
+args = ["--port", "3000"]
+env = { API_KEY = "your_key" }
+```
+
+### Supported Transports
+
+1. **stdio** - Local MCP servers (npm packages, Python scripts)
+2. **HTTP** - Remote MCP servers with Bearer token auth
+3. **Streamable HTTP** - Modern HTTP transport with streaming support
+
+### Popular MCP Servers
+
+- **@modelcontextprotocol/server-filesystem** - File system operations
+- **mcp-server-github** - GitHub API integration
+- **mcp-server-postgres** - PostgreSQL database access
+- **@z_ai/mcp-server** - Zhipu AI tools (web search, code execution)
 
 ## Skills System
 
