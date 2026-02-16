@@ -1,6 +1,6 @@
 //! Bridge between MCP tools and rustclaw's `ToolFunction` trait
 
-use crate::client::ToolDefinition;
+use crate::client::{MCPClient, ToolDefinition};
 use anyhow::Result;
 use rustclaw_types::Tool;
 use serde_json::Value;
@@ -18,7 +18,7 @@ pub struct MCPToolWrapper {
     /// Tool definition from MCP server
     pub definition: ToolDefinition,
     /// Reference to registry for tool execution
-    pub registry: Arc<RwLock<std::collections::HashMap<String, crate::client::MCPClient>>>,
+    pub registry: Arc<RwLock<std::collections::HashMap<String, MCPClient>>>,
 }
 
 impl rustclaw_provider::ToolFunction for MCPToolWrapper {
@@ -34,7 +34,7 @@ impl rustclaw_provider::ToolFunction for MCPToolWrapper {
     }
 
     fn execute(&self, args: Value) -> Result<Value> {
-        // Convert async execution to sync (ToolFunction is sync)
+        // Convert async call_tool to sync (ToolFunction trait is sync)
         let registry = Arc::clone(&self.registry);
         let server = self.server_name.clone();
         let tool = self.tool_name.clone();
@@ -47,9 +47,9 @@ impl rustclaw_provider::ToolFunction for MCPToolWrapper {
                     .get(&server)
                     .ok_or_else(|| anyhow::anyhow!("MCP server '{server}' not available"))?;
 
-                // call_tool is no longer async since it's a placeholder
                 client
                     .call_tool(&tool, args)
+                    .await
                     .map_err(|e| anyhow::anyhow!("MCP tool call failed: {e}"))
             })
         })

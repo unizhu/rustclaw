@@ -19,12 +19,12 @@ pub enum MCPError {
     },
 
     /// Startup timeout exceeded
-    #[error("Server '{server}' timeout after {timeout}s")]
+    #[error("Server '{server}' timeout after {timeout:?}")]
     StartupTimeout {
         /// Server name
         server: String,
-        /// Timeout in seconds
-        timeout: u64,
+        /// Timeout duration
+        timeout: std::time::Duration,
     },
 
     /// Tool not found on server
@@ -34,6 +34,17 @@ pub enum MCPError {
         server: String,
         /// Tool name
         tool: String,
+    },
+
+    /// Tool execution failed
+    #[error("Tool '{tool}' failed on server '{server}': {reason}")]
+    ToolExecution {
+        /// Server name
+        server: String,
+        /// Tool name
+        tool: String,
+        /// Failure reason
+        reason: String,
     },
 
     /// Server disconnected unexpectedly
@@ -59,6 +70,10 @@ pub enum MCPError {
     /// Configuration error
     #[error("Configuration error: {0}")]
     Config(String),
+
+    /// rmcp SDK error
+    #[error("MCP SDK error: {0}")]
+    Sdk(String),
 
     /// Serialization/deserialization error
     #[error("JSON error: {0}")]

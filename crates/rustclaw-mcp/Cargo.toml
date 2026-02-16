@@ -9,6 +9,11 @@ license.workspace = true
 # MCP SDK
 rmcp = { workspace = true }
 
+# HTTP client (for custom StreamableHttpClient impl)
+reqwest = { version = "0.12", features = ["json", "stream"] }
+http = "1"
+sse-stream = "0.2"
+
 # Internal crates
 rustclaw-types = { path = "../rustclaw-types" }
 rustclaw-provider = { path = "../rustclaw-provider" }
@@ -17,9 +22,6 @@ rustclaw-provider = { path = "../rustclaw-provider" }
 tokio = { workspace = true, features = ["process", "time", "sync", "rt-multi-thread"] }
 tokio-stream.workspace = true
 futures.workspace = true
-
-# HTTP client (optional)
-reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false, optional = true }
 
 # Serialization
 serde.workspace = true
@@ -33,12 +35,11 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [features]
-default = ["stdio"]
-stdio = []
-http = ["reqwest"]
+default = []
 
 [dev-dependencies]
 tokio-test = "0.4"
+toml.workspace = true
 
 # Quality gates
 [lints.rust]

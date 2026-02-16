@@ -34,7 +34,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 
 # MCP client
-rmcp = { version = "0.15", features = ["client"] }
+rmcp = { version = "0.15", features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
 
 # Error handling
 anyhow = "1.0"

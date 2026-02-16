@@ -53,8 +53,8 @@ pub struct TelegramConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct OpenAIConfig {
-    #[allow(dead_code)]
-    pub api_key: String,
+    #[serde(rename = "api_key")]
+    pub _api_key: String,
     pub model: String,
     pub base_url: Option<String>,
 }

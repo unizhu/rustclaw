@@ -76,8 +76,19 @@ impl SkillsRegistry {
         Ok(())
     }
 
-    /// Scan a single directory for skills
+    /// Scan a single directory for skills (recursively scans subdirectories)
     fn scan_directory(&mut self, dir: &Path) -> Result<()> {
+        self.scan_directory_recursive(dir, 0)
+    }
+    
+    /// Recursively scan directory and all subdirectories for skills
+    fn scan_directory_recursive(&mut self, dir: &Path, depth: usize) -> Result<()> {
+        // Safety limit to prevent infinite recursion
+        if depth > 10 {
+            warn!("Maximum directory depth (10) reached at {:?}", dir);
+            return Ok(());
+        }
+        
         let entries = std::fs::read_dir(dir)
             .with_context(|| format!("Failed to read directory {:?}", dir))?;
 
@@ -89,7 +100,7 @@ impl SkillsRegistry {
                 continue;
             }
 
-            // Try to load skill metadata
+            // Try to load skill metadata from this directory
             match Skill::metadata_from_dir(&path) {
                 Ok(skill) => {
                     let name = skill.name().to_string();
@@ -97,9 +108,13 @@ impl SkillsRegistry {
                     self.skills.insert(name, skill);
                 }
                 Err(e) => {
-                    debug!("Skipping {:?}: {}", path, e);
+                    // This directory doesn't have a SKILL.md, but might contain subdirectories that do
+                    debug!("No skill in {:?}: {}", path, e);
                 }
             }
+            
+            // Always recurse into subdirectories to find more skills
+            self.scan_directory_recursive(&path, depth + 1)?;
         }
 
         Ok(())

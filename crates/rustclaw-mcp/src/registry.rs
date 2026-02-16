@@ -103,7 +103,7 @@ impl MCPToolRegistry {
                 tool: tool_name.into(),
             })?;
 
-        client.call_tool(tool_name, args)
+        client.call_tool(tool_name, args).await
     }
 
     /// Get all tools from all connected servers as `ToolFunction` wrappers
