@@ -12,9 +12,8 @@ bot_token = ""  # Set via TELEGRAM_BOT_TOKEN env var
 default = "openai"  # or "ollama"
 
 [providers.openai]
-api_key = ""  # Set via OPENAI_API_KEY env var
+# api_key and base_url are optional - set via OPENAI_API_KEY and OPENAI_BASE_URL env vars
 model = "gpt-4o-mini"
-base_url = ""  # Optional: Set via OPENAI_BASE_URL env var
 
 [providers.ollama]
 base_url = "http://localhost:11434"

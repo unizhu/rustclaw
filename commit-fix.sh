@@ -1,11 +1,10 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 git add -A
-git commit -m "fix: Pass API key to OpenAI client for OpenRouter support
+git commit -m "fix: Clean up Provider type and service initialization
 
-- Add api_key field to Provider enum
-- Update create_client() to pass API key to OpenAIConfig
-- Change OpenAIConfig.api_key from String to Option<String>
-- Add openai_with_api_key() and openai_full() constructors
-- Fixes 502 error when using OpenRouter with custom base URL"
+- Remove duplicate provider.rs file (was unused)
+- Simplify Provider constructor matching in service.rs
+- Update DEFAULT_CONFIG to not include empty api_key/base_url
+- Fix filter logic for Option<String> fields"
 git push
