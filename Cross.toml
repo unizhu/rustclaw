@@ -1,0 +1,28 @@
+# Cross compilation configuration for rustclaw
+# This file configures the cross-rs tool for building cross-platform binaries
+
+[build]
+# Use zig as the linker for better cross-compilation support
+# zig = true
+
+# Configure environment variables for all targets
+[build.env]
+passthrough = [
+    "RUST_BACKTRACE",
+    "RUST_LOG",
+    "CARGO_TERM_COLOR",
+]
+
+# x86_64 Linux configuration with OpenSSL
+[target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
+
+[target.x86_64-unknown-linux-gnu.pre-build]
+apt.packages = ["libssl-dev", "pkg-config"]
+
+# AArch64 Linux configuration with OpenSSL
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+
+[target.aarch64-unknown-linux-gnu.pre-build]
+apt.packages = ["libssl-dev", "pkg-config"]
