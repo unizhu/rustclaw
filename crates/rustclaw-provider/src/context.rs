@@ -277,13 +277,12 @@ impl ContextManager {
         let mut tokens_saved = 0;
 
         for i in 0..turns_to_mask {
-            if let Some(turn) = self.turns.get_mut(i)
-                && !turn.is_masked
-                && !turn.is_summarized
-            {
-                let old_tokens = turn.token_count;
-                *turn = turn.masked();
-                tokens_saved += old_tokens.saturating_sub(turn.token_count);
+            if let Some(turn) = self.turns.get_mut(i) {
+                if !turn.is_masked && !turn.is_summarized {
+                    let old_tokens = turn.token_count;
+                    *turn = turn.masked();
+                    tokens_saved += old_tokens.saturating_sub(turn.token_count);
+                }
             }
         }
 

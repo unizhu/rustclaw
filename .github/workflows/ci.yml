@@ -78,3 +78,5 @@ jobs:
         with:
           name: rustclaw-linux-x86_64
           path: target/release/rustclaw-gateway
+          retention-days: 7
+          if-no-files-found: warn

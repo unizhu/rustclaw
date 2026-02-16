@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Initialize the logging system
 pub fn init_logging(level: &str) -> Result<()> {

@@ -5,8 +5,7 @@
 
 pub mod context;
 
-use anyhow::{Result, anyhow};
-use async_openai::Client;
+use anyhow::{anyhow, Result};
 use async_openai::config::OpenAIConfig;
 use async_openai::types::chat::{
     ChatChoice, ChatCompletionMessageToolCalls, ChatCompletionRequestMessage,
@@ -14,6 +13,7 @@ use async_openai::types::chat::{
     ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionTools,
     CreateChatCompletionRequestArgs, FunctionObject,
 };
+use async_openai::Client;
 use rustclaw_types::{
     CompletionResponse, Message, MessageContent, Provider, Tool, ToolCall, ToolResult,
 };
@@ -296,12 +296,10 @@ impl ProviderService {
         prompt: &str,
         tool_results: Option<Vec<ToolResult>>,
     ) -> Result<Vec<ChatCompletionRequestMessage>> {
-        let mut chat_messages = vec![
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(self.system_prompt.clone())
-                .build()?
-                .into(),
-        ];
+        let mut chat_messages = vec![ChatCompletionRequestSystemMessageArgs::default()
+            .content(self.system_prompt.clone())
+            .build()?
+            .into()];
 
         // Add conversation history
         for msg in messages {

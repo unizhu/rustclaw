@@ -15,11 +15,15 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  contents: write
+
 jobs:
   # Build for Linux (x86_64 and aarch64)
   build-linux:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-unknown-linux-gnu
@@ -34,19 +38,27 @@ jobs:
       with:
         targets: ${{ matrix.target }}
     
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-cargo-
+    
     - name: Install cross
-      run: cargo install cross
+      run: cargo install cross --git https://github.com/cross-rs/cross
     
     - name: Build binary
       run: |
-        # Use cross with OpenSSL support
         cross build --release --target ${{ matrix.target }}
         
         cd target/${{ matrix.target }}/release
         tar -czf rustclaw-${{ matrix.target }}.tar.gz rustclaw-gateway
         mv rustclaw-${{ matrix.target }}.tar.gz ${{ github.workspace }}/
-      env:
-        OPENSSL_STATIC: "1"
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -54,11 +66,13 @@ jobs:
         name: rustclaw-${{ matrix.target }}
         path: rustclaw-${{ matrix.target }}.tar.gz
         retention-days: 7
+        if-no-files-found: error
 
   # Build for macOS (x86_64 and aarch64)
   build-macos:
     runs-on: macos-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-apple-darwin
@@ -72,6 +86,17 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-cargo-
     
     - name: Build binary
       run: |
@@ -87,11 +112,13 @@ jobs:
         name: rustclaw-${{ matrix.target }}
         path: rustclaw-${{ matrix.target }}.tar.gz
         retention-days: 7
+        if-no-files-found: error
 
   # Build for Windows (x86_64)
   build-windows:
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-pc-windows-msvc
@@ -104,6 +131,17 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-cargo-
     
     - name: Build binary
       run: |
@@ -119,6 +157,7 @@ jobs:
         name: rustclaw-${{ matrix.target }}
         path: rustclaw-${{ matrix.target }}.zip
         retention-days: 7
+        if-no-files-found: error
 
   # Run tests
   test:
@@ -133,20 +172,14 @@ jobs:
     - name: Cache cargo registry
       uses: actions/cache@v4
       with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo index
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache target directory
-      uses: actions/cache@v4
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-test-
+          ${{ runner.os }}-cargo-
     
     - name: Run tests
       run: cargo test --all-features --workspace
@@ -162,6 +195,8 @@ jobs:
     needs: [build-linux, build-macos, build-windows, test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout code
@@ -178,6 +213,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         path: artifacts
+        merge-multiple: false
     
     - name: Prepare release files
       run: |

@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::{EchoTool, ProviderService, ToolFunction, ToolRegistry};
 use rustclaw_types::{Message as RustClawMessage, MessageContent, Tool, User};

@@ -12,7 +12,7 @@ resolver = "2"
 
 [workspace.package]
 version = "0.1.1"
-edition = "2024"
+edition = "2021"
 authors = ["UGENT"]
 license = "MIT"
 
@@ -50,12 +50,12 @@ dotenvy = "0.15"
 dirs = "5.0"
 
 # Database
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "tls-rustls"] }
 
-# Telegram
-teloxide = { version = "0.17", features = ["macros"] }
+# Telegram (use rustls instead of native-tls)
+teloxide = { version = "0.17", default-features = false, features = ["macros", "rustls"] }
 
-# LLM
+# LLM (use rustls for HTTP client)
 async-openai = { version = "0.32.4", features = ["chat-completion"] }
 
 # UUID

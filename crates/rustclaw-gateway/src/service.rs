@@ -1,6 +1,6 @@
 use crate::config::Config;
 use anyhow::Result;
-use rustclaw_channel::{TelegramService, create_default_tools};
+use rustclaw_channel::{create_default_tools, TelegramService};
 use rustclaw_mcp::MCPToolRegistry;
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::ProviderService;
