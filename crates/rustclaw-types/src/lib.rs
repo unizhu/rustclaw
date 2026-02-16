@@ -76,6 +76,7 @@ impl Message {
 pub enum Provider {
     OpenAI {
         model: String,
+        api_key: Option<String>,
         base_url: Option<String>,
     },
     Ollama {
@@ -88,6 +89,7 @@ impl Default for Provider {
     fn default() -> Self {
         Provider::OpenAI {
             model: "gpt-4o-mini".to_string(),
+            api_key: None,
             base_url: None,
         }
     }
@@ -97,6 +99,7 @@ impl Provider {
     pub fn openai(model: &str) -> Self {
         Provider::OpenAI {
             model: model.to_string(),
+            api_key: None,
             base_url: None,
         }
     }
@@ -104,6 +107,23 @@ impl Provider {
     pub fn openai_with_base_url(model: &str, base_url: &str) -> Self {
         Provider::OpenAI {
             model: model.to_string(),
+            api_key: None,
+            base_url: Some(base_url.to_string()),
+        }
+    }
+
+    pub fn openai_with_api_key(model: &str, api_key: &str) -> Self {
+        Provider::OpenAI {
+            model: model.to_string(),
+            api_key: Some(api_key.to_string()),
+            base_url: None,
+        }
+    }
+
+    pub fn openai_full(model: &str, api_key: &str, base_url: &str) -> Self {
+        Provider::OpenAI {
+            model: model.to_string(),
+            api_key: Some(api_key.to_string()),
             base_url: Some(base_url.to_string()),
         }
     }

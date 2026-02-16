@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum Provider {
     OpenAI {
         model: String,
+        api_key: Option<String>,
         base_url: Option<String>,
     },
     Ollama {
@@ -17,6 +18,7 @@ impl Provider {
     pub fn openai(model: impl Into<String>) -> Self {
         Self::OpenAI {
             model: model.into(),
+            api_key: None,
             base_url: None,
         }
     }
@@ -24,6 +26,27 @@ impl Provider {
     pub fn openai_with_base_url(model: impl Into<String>, base_url: impl Into<String>) -> Self {
         Self::OpenAI {
             model: model.into(),
+            api_key: None,
+            base_url: Some(base_url.into()),
+        }
+    }
+
+    pub fn openai_with_api_key(model: impl Into<String>, api_key: impl Into<String>) -> Self {
+        Self::OpenAI {
+            model: model.into(),
+            api_key: Some(api_key.into()),
+            base_url: None,
+        }
+    }
+
+    pub fn openai_full(
+        model: impl Into<String>,
+        api_key: impl Into<String>,
+        base_url: impl Into<String>,
+    ) -> Self {
+        Self::OpenAI {
+            model: model.into(),
+            api_key: Some(api_key.into()),
             base_url: Some(base_url.into()),
         }
     }

@@ -261,18 +261,26 @@ impl ProviderService {
     // ========================================================================
 
     fn create_client(&self) -> Result<Client<OpenAIConfig>> {
-        let base_url = match &self.provider {
-            Provider::OpenAI { base_url, .. } => base_url.clone(),
-            Provider::Ollama { base_url, .. } => Some(base_url.clone()),
+        let (api_key, base_url) = match &self.provider {
+            Provider::OpenAI { api_key, base_url, .. } => (api_key.clone(), base_url.clone()),
+            Provider::Ollama { base_url, .. } => (None, Some(base_url.clone())),
         };
 
-        let client = if let Some(url) = base_url {
+        // Build config with API key and optional base URL
+        let mut config = OpenAIConfig::new();
+        
+        if let Some(key) = api_key {
+            let preview_len = 20.min(key.len());
+            debug!("Using API key: {}...", &key[..preview_len]);
+            config = config.with_api_key(key);
+        }
+        
+        if let Some(url) = base_url {
             debug!("Using API base URL: {}", url);
-            Client::with_config(OpenAIConfig::new().with_api_base(url))
-        } else {
-            Client::new()
-        };
+            config = config.with_api_base(url);
+        }
 
+        let client = Client::with_config(config);
         Ok(client)
     }
 

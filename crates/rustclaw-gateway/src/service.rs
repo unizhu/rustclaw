@@ -42,17 +42,22 @@ impl GatewayService {
         // Initialize provider based on config
         let provider = match self.config.providers.default.as_str() {
             "openai" => {
-                if let Some(base_url) = &self.config.providers.openai.base_url {
-                    if base_url.is_empty() {
-                        Provider::openai(&self.config.providers.openai.model)
-                    } else {
-                        Provider::openai_with_base_url(
-                            &self.config.providers.openai.model,
-                            base_url,
-                        )
+                let model = &self.config.providers.openai.model;
+                let api_key = self.config.providers.openai.api_key.clone();
+                let base_url = self.config.providers.openai.base_url.clone();
+                
+                // Use full constructor if we have API key and/or base URL
+                match (&api_key, &base_url) {
+                    (Some(key), Some(url)) if !key.is_empty() && !url.is_empty() => {
+                        Provider::openai_full(model, key, url)
                     }
-                } else {
-                    Provider::openai(&self.config.providers.openai.model)
+                    (Some(key), None) | (Some(key), Some(_)) if !key.is_empty() => {
+                        Provider::openai_with_api_key(model, key)
+                    }
+                    (None, Some(url)) | (Some(_), Some(url)) if !url.is_empty() => {
+                        Provider::openai_with_base_url(model, url)
+                    }
+                    _ => Provider::openai(model),
                 }
             }
             "ollama" => Provider::ollama(
