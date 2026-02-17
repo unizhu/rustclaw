@@ -1,11 +1,18 @@
 use anyhow::{anyhow, Result};
 use rustclaw_persistence::PersistenceService;
 use rustclaw_provider::{EchoTool, ProviderService, ToolFunction, ToolRegistry};
-use rustclaw_types::{Message as RustClawMessage, MessageContent, Tool, User};
+use rustclaw_types::{
+    DocumentContent, ImageContent, Message as RustClawMessage, MessageContent, Tool, User,
+};
+use std::path::PathBuf;
 use std::sync::Arc;
+use teloxide::net::Download;
 use teloxide::{error_handlers::LoggingErrorHandler, prelude::*, utils::command::BotCommands};
 use tokio::sync::RwLock;
 use tracing::{error, info};
+
+mod utils;
+pub use utils::{format_for_telegram, format_for_telegram_truncated};
 
 /// Maximum message length for Telegram (4096 chars, but we use less to be safe)
 const MAX_MESSAGE_LENGTH: usize = 4000;
@@ -36,6 +43,8 @@ pub struct TelegramService {
     bot: Bot,
     persistence: Arc<RwLock<PersistenceService>>,
     provider: Arc<RwLock<ProviderService>>,
+    /// Directory to store downloaded files (relative to workspace)
+    downloads_dir: PathBuf,
 }
 
 /// Bot commands
@@ -57,10 +66,36 @@ impl TelegramService {
     pub fn new(token: &str, persistence: PersistenceService, provider: ProviderService) -> Self {
         let bot = Bot::new(token);
         info!("Telegram service initialized");
+
+        // Default downloads directory
+        let downloads_dir = PathBuf::from("./downloads");
+
         Self {
             bot,
             persistence: Arc::new(RwLock::new(persistence)),
             provider: Arc::new(RwLock::new(provider)),
+            downloads_dir,
+        }
+    }
+
+    /// Create a new Telegram service with custom downloads directory
+    pub fn with_downloads_dir(
+        token: &str,
+        persistence: PersistenceService,
+        provider: ProviderService,
+        downloads_dir: PathBuf,
+    ) -> Self {
+        let bot = Bot::new(token);
+        info!(
+            "Telegram service initialized with downloads dir: {:?}",
+            downloads_dir
+        );
+
+        Self {
+            bot,
+            persistence: Arc::new(RwLock::new(persistence)),
+            provider: Arc::new(RwLock::new(provider)),
+            downloads_dir,
         }
     }
 
@@ -88,10 +123,18 @@ impl TelegramService {
 
         info!("Starting Telegram bot...");
 
+        // Ensure downloads directory exists
+        tokio::fs::create_dir_all(&self.downloads_dir)
+            .await
+            .map_err(|e| anyhow!("Failed to create downloads directory: {}", e))?;
+        info!("Downloads directory: {:?}", self.downloads_dir);
+
         let persistence = self.persistence.clone();
         let provider = self.provider.clone();
+        let downloads_dir = self.downloads_dir.clone();
+        let bot_for_download = self.bot.clone();
 
-        // Use Dispatcher instead of repl for better error handling
+        // Use Dispatcher with multiple message type handlers
         let handler = Update::filter_message()
             .branch(
                 dptree::entry()
@@ -99,11 +142,25 @@ impl TelegramService {
                     .endpoint(Self::handle_command),
             )
             .branch(
-                dptree::filter(|msg: Message| msg.text().is_some()).endpoint(Self::handle_message),
+                dptree::filter(|msg: Message| msg.text().is_some())
+                    .endpoint(Self::handle_text_message),
+            )
+            .branch(
+                dptree::filter(|msg: Message| msg.photo().is_some())
+                    .endpoint(Self::handle_photo_message),
+            )
+            .branch(
+                dptree::filter(|msg: Message| msg.document().is_some())
+                    .endpoint(Self::handle_document_message),
             );
 
         let mut dispatcher = Dispatcher::builder(self.bot.clone(), handler)
-            .dependencies(dptree::deps![persistence, provider])
+            .dependencies(dptree::deps![
+                persistence,
+                provider,
+                downloads_dir,
+                bot_for_download
+            ])
             .error_handler(LoggingErrorHandler::with_custom_text(
                 "An error has occurred in the dispatcher",
             ))
@@ -190,7 +247,9 @@ impl TelegramService {
         chat_id: ChatId,
         text: &str,
     ) -> Result<(), teloxide::RequestError> {
-        let chunks = Self::split_message(text);
+        // Format text for Telegram (handle escaped newlines, etc.)
+        let formatted = format_for_telegram(text);
+        let chunks = Self::split_message(&formatted);
         for (i, chunk) in chunks.iter().enumerate() {
             if chunks.len() > 1 {
                 bot.send_message(
@@ -250,8 +309,8 @@ impl TelegramService {
         Ok(())
     }
 
-    /// Handle regular messages
-    async fn handle_message(
+    /// Handle text messages
+    async fn handle_text_message(
         bot: Bot,
         msg: Message,
         persistence: Arc<RwLock<PersistenceService>>,
@@ -290,7 +349,6 @@ impl TelegramService {
         // Get AI response using agentic loop (handles tools automatically)
         let response = {
             let provider = provider.read().await;
-            // Use agentic completion with configured max iterations
             provider
                 .complete_agentic_default(&recent_messages, text)
                 .await
@@ -299,12 +357,309 @@ impl TelegramService {
         match response {
             Ok(response) => {
                 Self::send_message_safe(&bot, chat_id, &response).await?;
+
+                // Save AI response to context so follow-up questions work
+                let ai_msg = RustClawMessage::new(
+                    chat_id.0,
+                    User::new(0), // System/AI user
+                    MessageContent::Text(response.clone()),
+                );
+                let persistence = persistence.write().await;
+                if let Err(e) = persistence.save_message(&ai_msg).await {
+                    error!("Failed to save AI response: {}", e);
+                }
             }
             Err(e) => {
                 error!("Failed to get AI response: {}", e);
                 Self::send_message_safe(&bot, chat_id, &format!("❌ Error: {}", e)).await?;
             }
         }
+
+        Ok(())
+    }
+
+    /// Handle photo messages
+    async fn handle_photo_message(
+        bot: Bot,
+        msg: Message,
+        persistence: Arc<RwLock<PersistenceService>>,
+        provider: Arc<RwLock<ProviderService>>,
+        downloads_dir: PathBuf,
+        download_bot: Bot,
+    ) -> Result<(), teloxide::RequestError> {
+        let photos = match msg.photo() {
+            Some(p) if !p.is_empty() => p,
+            _ => return Ok(()),
+        };
+
+        let chat_id = msg.chat.id;
+
+        // Acknowledge receipt
+        bot.send_message(chat_id, "📷 Processing image...").await?;
+
+        // Get the largest photo (highest quality)
+        let photo = photos.last().unwrap();
+
+        // Download the photo - use file.file.id for the file ID
+        let file_id = &photo.file.id;
+        let file_unique_id = &photo.file.unique_id;
+        let filename = format!(
+            "{}_{}.jpg",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+            file_unique_id
+        );
+        let local_path = downloads_dir.join(&filename);
+
+        if let Err(e) = Self::download_file(&download_bot, &file_id.0, &local_path).await {
+            error!("Failed to download photo: {}", e);
+            bot.send_message(chat_id, format!("❌ Failed to download image: {}", e))
+                .await?;
+            return Ok(());
+        }
+
+        info!("Downloaded photo to {:?}", local_path);
+
+        // Create image content
+        let image_content = ImageContent {
+            file_id: file_id.0.clone(),
+            file_unique_id: file_unique_id.0.clone(),
+            width: photo.width,
+            height: photo.height,
+            caption: msg.caption().map(|s| s.to_string()),
+            local_path: Some(local_path.clone()),
+        };
+
+        let user_id = msg.from.as_ref().map(|u| u.id.0 as i64).unwrap_or(0);
+        let user = User::new(user_id);
+
+        let rustclaw_msg =
+            RustClawMessage::new(chat_id.0, user, MessageContent::Image(image_content));
+
+        // Save message
+        {
+            let persistence = persistence.write().await;
+            if let Err(e) = persistence.save_message(&rustclaw_msg).await {
+                error!("Failed to save message: {}", e);
+            }
+        }
+
+        // Get recent messages for context
+        let recent_messages = {
+            let persistence = persistence.read().await;
+            persistence
+                .get_recent_messages(chat_id.0, 10)
+                .await
+                .unwrap_or_default()
+        };
+
+        // Build prompt with image context - let LLM decide how to process
+        let caption = msg.caption().unwrap_or("");
+        let image_prompt = if caption.is_empty() {
+            format!(
+                "The user sent an image without any message.\n\
+                 Image saved at: {:?}\n\
+                 Image dimensions: {}x{}\n\n\
+                 Use analyze_image tool to analyze this image and describe what you see.",
+                local_path, photo.width, photo.height
+            )
+        } else {
+            format!(
+                "The user sent an image with this request: \"{}\"\n\
+                 Image saved at: {:?}\n\
+                 Image dimensions: {}x{}\n\n\
+                 Use the analyze_image tool to fulfill the user's request about this image.",
+                caption, local_path, photo.width, photo.height
+            )
+        };
+
+        // Get AI response
+        let response = {
+            let provider = provider.read().await;
+            provider
+                .complete_agentic_default(&recent_messages, &image_prompt)
+                .await
+        };
+
+        match response {
+            Ok(response) => {
+                let response_text = if response.trim().is_empty() {
+                    "✅ Image processed. What would you like me to do with it?".to_string()
+                } else {
+                    response.clone()
+                };
+                Self::send_message_safe(&bot, chat_id, &response_text).await?;
+
+                // Save AI response to context so follow-up questions work
+                let ai_msg = RustClawMessage::new(
+                    chat_id.0,
+                    User::new(0), // System/AI user
+                    MessageContent::Text(format!("[Image Analysis Result]\n{}", response_text)),
+                );
+                let persistence = persistence.write().await;
+                if let Err(e) = persistence.save_message(&ai_msg).await {
+                    error!("Failed to save AI response: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to get AI response: {}", e);
+                Self::send_message_safe(&bot, chat_id, &format!("❌ Error: {}", e)).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Handle document messages
+    async fn handle_document_message(
+        bot: Bot,
+        msg: Message,
+        persistence: Arc<RwLock<PersistenceService>>,
+        provider: Arc<RwLock<ProviderService>>,
+        downloads_dir: PathBuf,
+        download_bot: Bot,
+    ) -> Result<(), teloxide::RequestError> {
+        let doc = match msg.document() {
+            Some(d) => d,
+            None => return Ok(()),
+        };
+
+        let chat_id = msg.chat.id;
+
+        // Get file info from doc.file
+        let file_id = &doc.file.id;
+        let file_unique_id = &doc.file.unique_id;
+        let file_size = doc.file.size;
+
+        // Sanitize filename
+        let original_name = doc.file_name.as_deref().unwrap_or("unknown_file");
+        let safe_name: String = original_name
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+            .collect();
+
+        let filename = if safe_name.is_empty() {
+            format!("document_{}.bin", file_unique_id.0)
+        } else {
+            safe_name
+        };
+
+        let local_path = downloads_dir.join(&filename);
+
+        bot.send_message(
+            chat_id,
+            format!("📄 Downloading: {} ({} bytes)", filename, file_size),
+        )
+        .await?;
+
+        // Download the document
+        if let Err(e) = Self::download_file(&download_bot, &file_id.0, &local_path).await {
+            error!("Failed to download document: {}", e);
+            bot.send_message(chat_id, format!("❌ Failed to download file: {}", e))
+                .await?;
+            return Ok(());
+        }
+
+        info!("Downloaded document to {:?}", local_path);
+
+        // Create document content
+        let doc_content = DocumentContent {
+            file_id: file_id.0.clone(),
+            file_unique_id: file_unique_id.0.clone(),
+            file_name: doc.file_name.clone(),
+            mime_type: doc.mime_type.as_ref().map(|m| m.to_string()),
+            file_size: Some(file_size as u64),
+            caption: msg.caption().map(|s| s.to_string()),
+            local_path: Some(local_path.clone()),
+        };
+
+        let user_id = msg.from.as_ref().map(|u| u.id.0 as i64).unwrap_or(0);
+        let user = User::new(user_id);
+
+        let rustclaw_msg =
+            RustClawMessage::new(chat_id.0, user, MessageContent::Document(doc_content));
+
+        // Save message
+        {
+            let persistence = persistence.write().await;
+            if let Err(e) = persistence.save_message(&rustclaw_msg).await {
+                error!("Failed to save message: {}", e);
+            }
+        }
+
+        // Get recent messages for context
+        let recent_messages = {
+            let persistence = persistence.read().await;
+            persistence
+                .get_recent_messages(chat_id.0, 10)
+                .await
+                .unwrap_or_default()
+        };
+
+        // Build prompt with document context
+        let caption = msg.caption().unwrap_or("[No caption]");
+        let doc_prompt = format!(
+            "The user sent a file.\n\
+             Filename: {}\n\
+             MIME type: {:?}\n\
+             Size: {} bytes\n\
+             Caption: {}\n\
+             Saved at: {:?}\n\n\
+             Use available tools (like read_file, bash) to examine the file if it's a text-based format. \
+             Ask the user what they want you to do with it.",
+            filename, doc.mime_type, file_size, caption, local_path
+        );
+
+        // Get AI response
+        let response = {
+            let provider = provider.read().await;
+            provider
+                .complete_agentic_default(&recent_messages, &doc_prompt)
+                .await
+        };
+
+        match response {
+            Ok(response) => {
+                let response_text = if response.trim().is_empty() {
+                    "✅ File processed. What would you like me to do with it?".to_string()
+                } else {
+                    response.clone()
+                };
+                Self::send_message_safe(&bot, chat_id, &response_text).await?;
+
+                // Save AI response to context so follow-up questions work
+                let ai_msg = RustClawMessage::new(
+                    chat_id.0,
+                    User::new(0), // System/AI user
+                    MessageContent::Text(format!("[File Analysis Result]\n{}", response_text)),
+                );
+                let persistence = persistence.write().await;
+                if let Err(e) = persistence.save_message(&ai_msg).await {
+                    error!("Failed to save AI response: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to get AI response: {}", e);
+                Self::send_message_safe(&bot, chat_id, &format!("❌ Error: {}", e)).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Download a file from Telegram
+    async fn download_file(bot: &Bot, file_id: &str, local_path: &PathBuf) -> Result<()> {
+        let file = bot
+            .get_file(teloxide::types::FileId(file_id.to_string()))
+            .await
+            .map_err(|e| anyhow!("Failed to get file info: {}", e))?;
+
+        let mut dest = tokio::fs::File::create(local_path)
+            .await
+            .map_err(|e| anyhow!("Failed to create local file: {}", e))?;
+
+        bot.download_file(&file.path, &mut dest)
+            .await
+            .map_err(|e| anyhow!("Failed to download file: {}", e))?;
 
         Ok(())
     }

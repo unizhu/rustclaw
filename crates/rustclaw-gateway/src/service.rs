@@ -43,9 +43,21 @@ impl GatewayService {
         let provider = match self.config.providers.default.as_str() {
             "openai" => {
                 let model = &self.config.providers.openai.model;
-                let api_key = self.config.providers.openai.api_key.as_ref().filter(|k| !k.is_empty());
-                let base_url = self.config.providers.openai.base_url.as_ref().filter(|u| !u.is_empty());
-                
+                let api_key = self
+                    .config
+                    .providers
+                    .openai
+                    .api_key
+                    .as_ref()
+                    .filter(|k| !k.is_empty());
+                let base_url = self
+                    .config
+                    .providers
+                    .openai
+                    .base_url
+                    .as_ref()
+                    .filter(|u| !u.is_empty());
+
                 // Use full constructor if we have API key and/or base URL
                 match (api_key, base_url) {
                     (Some(key), Some(url)) => Provider::openai_full(model, key, url),

@@ -4,6 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 /// A user in the system
@@ -47,6 +48,46 @@ impl User {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageContent {
     Text(String),
+    /// Image content from Telegram
+    Image(ImageContent),
+    /// Document/file content from Telegram
+    Document(DocumentContent),
+}
+
+/// Image content received from Telegram
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageContent {
+    /// Telegram file ID (can be used to re-send)
+    pub file_id: String,
+    /// Unique file identifier across bots
+    pub file_unique_id: String,
+    /// Image width in pixels
+    pub width: u32,
+    /// Image height in pixels
+    pub height: u32,
+    /// Optional caption from the user
+    pub caption: Option<String>,
+    /// Local file path after download (relative to downloads folder)
+    pub local_path: Option<PathBuf>,
+}
+
+/// Document content received from Telegram
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DocumentContent {
+    /// Telegram file ID (can be used to re-send)
+    pub file_id: String,
+    /// Unique file identifier across bots
+    pub file_unique_id: String,
+    /// Original filename
+    pub file_name: Option<String>,
+    /// MIME type of the file
+    pub mime_type: Option<String>,
+    /// File size in bytes
+    pub file_size: Option<u64>,
+    /// Optional caption from the user
+    pub caption: Option<String>,
+    /// Local file path after download (relative to downloads folder)
+    pub local_path: Option<PathBuf>,
 }
 
 /// A message in a conversation

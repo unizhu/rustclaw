@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rustclaw_types::{Message, MessageContent, User};
 use sqlx::SqlitePool;
 use tracing::info;
@@ -81,8 +81,9 @@ impl PersistenceService {
         // First save the user
         self.save_user(&message.sender).await?;
 
-        // Then save the message
-        let MessageContent::Text(content) = &message.content;
+        // Serialize content to JSON for storage
+        let content_json = serde_json::to_string(&message.content)
+            .map_err(|e| anyhow!("Failed to serialize message content: {}", e))?;
 
         sqlx::query(
             r#"
@@ -93,7 +94,7 @@ impl PersistenceService {
         .bind(message.id.to_string())
         .bind(message.chat_id)
         .bind(message.sender.id.to_string())
-        .bind(content)
+        .bind(content_json)
         .bind(message.timestamp.to_rfc3339())
         .execute(&self.pool)
         .await?;
@@ -136,6 +137,11 @@ impl PersistenceService {
                     .map(|dt| dt.with_timezone(&chrono::Utc))
                     .unwrap_or_else(|_| chrono::Utc::now());
 
+                // Try to parse content as JSON, fall back to Text
+                let content_str: String = row.get("content");
+                let content: MessageContent =
+                    serde_json::from_str(&content_str).unwrap_or(MessageContent::Text(content_str));
+
                 Message {
                     id: row.get("message_id"),
                     chat_id: row.get("chat_id"),
@@ -146,7 +152,7 @@ impl PersistenceService {
                         first_name: row.get("first_name"),
                         last_name: row.get("last_name"),
                     },
-                    content: MessageContent::Text(row.get("content")),
+                    content,
                     timestamp,
                 }
             })

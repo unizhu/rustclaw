@@ -220,6 +220,7 @@ impl ProviderService {
         let current_messages = messages.to_vec();
         let current_prompt = prompt.to_string();
         let mut tool_results = None;
+        let mut last_tool_output: Option<String> = None;
 
         for iteration in 0..max_iterations {
             debug!("Agentic iteration {} of {}", iteration + 1, max_iterations);
@@ -229,23 +230,36 @@ impl ProviderService {
                 .await?;
 
             if !response.has_tool_calls() {
+                // If LLM returns empty content but we have tool output, use that
+                let content_is_empty = response
+                    .content
+                    .as_ref()
+                    .is_none_or(|c| c.trim().is_empty());
+                if content_is_empty {
+                    if let Some(output) = last_tool_output.take() {
+                        debug!("LLM returned empty content, using tool output directly");
+                        return Ok(output);
+                    }
+                }
                 return Ok(response.content.unwrap_or_default());
             }
 
             // Execute tool calls
             let results = self.execute_tool_calls(&response.tool_calls).await;
 
-            // Log tool executions
+            // Log tool executions and save last output
             for (call, result) in response.tool_calls.iter().zip(results.iter()) {
+                let truncated_output = if result.output.chars().count() > 100 {
+                    result.output.chars().take(100).collect::<String>() + "..."
+                } else {
+                    result.output.clone()
+                };
                 info!(
                     "Tool executed: {} -> {}",
-                    call.function.name,
-                    if result.output.len() > 100 {
-                        &result.output[..100]
-                    } else {
-                        &result.output
-                    }
+                    call.function.name, truncated_output
                 );
+                // Save the last tool output in case LLM returns empty
+                last_tool_output = Some(result.output.clone());
             }
 
             // Prepare for next iteration
@@ -262,19 +276,21 @@ impl ProviderService {
 
     fn create_client(&self) -> Result<Client<OpenAIConfig>> {
         let (api_key, base_url) = match &self.provider {
-            Provider::OpenAI { api_key, base_url, .. } => (api_key.clone(), base_url.clone()),
+            Provider::OpenAI {
+                api_key, base_url, ..
+            } => (api_key.clone(), base_url.clone()),
             Provider::Ollama { base_url, .. } => (None, Some(base_url.clone())),
         };
 
         // Build config with API key and optional base URL
         let mut config = OpenAIConfig::new();
-        
+
         if let Some(key) = api_key {
             let preview_len = 20.min(key.len());
             debug!("Using API key: {}...", &key[..preview_len]);
             config = config.with_api_key(key);
         }
-        
+
         if let Some(url) = base_url {
             debug!("Using API base URL: {}", url);
             config = config.with_api_base(url);
@@ -313,6 +329,19 @@ impl ProviderService {
         for msg in messages {
             let content = match &msg.content {
                 MessageContent::Text(text) => text.clone(),
+                MessageContent::Image(img) => {
+                    // Include image context in the conversation
+                    let caption = img.caption.as_deref().unwrap_or("[Image]");
+                    format!(
+                        "[Image: {}x{}, caption: {}]",
+                        img.width, img.height, caption
+                    )
+                }
+                MessageContent::Document(doc) => {
+                    // Include document context in the conversation
+                    let name = doc.file_name.as_deref().unwrap_or("Unknown");
+                    format!("[Document: {}, {} bytes]", name, doc.file_size.unwrap_or(0))
+                }
             };
             chat_messages.push(
                 ChatCompletionRequestUserMessageArgs::default()
